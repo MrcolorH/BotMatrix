@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:provider/provider.dart';
+import '../core/services/storage_service.dart';
 import '../modules/service_registry.dart';
-import 'widgets/bot_config_card.dart';
+import 'settings_page.dart';
 import 'widgets/bot_master_card.dart';
 import 'widgets/log_console_view.dart';
 import 'widgets/service_slot_card.dart';
@@ -104,9 +105,19 @@ class HomePage extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            tooltip: '后台保活配置',
+            tooltip: '保活指南',
             icon: const Icon(Icons.battery_saver_rounded),
             onPressed: () => _showBatteryOptDialog(context),
+          ),
+          IconButton(
+            tooltip: '机器人配置与系统设置',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsPage()),
+              );
+            },
           ),
           IconButton(
             tooltip: '关于',
@@ -123,9 +134,31 @@ class HomePage extends StatelessWidget {
             const BotMasterCard(),
             const SizedBox(height: 12),
 
-            // 2. 全局 Telegram Token 核心配置卡片
-            const BotConfigCard(),
-            const SizedBox(height: 18),
+            // 2. 如果未配置 Bot Token，显示轻量引导横幅
+            if (context.watch<StorageService>().botToken.isEmpty) ...[
+              Card(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+                child: ListTile(
+                  leading: Icon(Icons.vpn_key_rounded, color: theme.colorScheme.primary),
+                  title: const Text(
+                    '尚未配置 Telegram Bot Token',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  subtitle: const Text(
+                    '点击前往设置填入 Token 即可开始使用机器人',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsPage()),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // 3. 动态功能服务插槽区域
             Row(

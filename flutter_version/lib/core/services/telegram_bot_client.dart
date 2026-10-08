@@ -25,6 +25,15 @@ class TelegramBotClient {
     throw Exception(res.data?['description'] ?? '获取 Bot 信息失败');
   }
 
+  /// 删除旧的 Webhook（避免因激活了 Webhook 导致 getUpdates 返回 409 Conflict）
+  Future<void> deleteWebhook({bool dropPendingUpdates = false}) async {
+    try {
+      await _dio.post('deleteWebhook', data: {
+        'drop_pending_updates': dropPendingUpdates,
+      });
+    } catch (_) {}
+  }
+
   /// 长轮询获取更新
   Future<List<TelegramUpdate>> getUpdates({
     required int offset,

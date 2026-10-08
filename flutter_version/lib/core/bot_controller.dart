@@ -95,6 +95,9 @@ class BotController extends ChangeNotifier {
 
       logger.success('Bot', '认证成功！机器人: @${_botUser!.username} (${_botUser!.firstName})');
 
+      // 清除可能存在的旧 Webhook，保证 getUpdates 长轮询正常工作
+      await _client!.deleteWebhook();
+
       // 启动 Android 前台保活服务与通知
       await _startForegroundService(_botUser!.displayName);
 
@@ -173,8 +176,25 @@ class BotController extends ChangeNotifier {
         if (CancelToken.isCancel(de)) {
           break;
         }
-        logger.warn('Bot', '网络轮询波动 (1秒后重试): ${de.message}');
-        await Future.delayed(const Duration(seconds: 2));
+
+        final statusCode = de.response?.statusCode;
+        final responseData = de.response?.data;
+        String? desc;
+        if (responseData is Map && responseData['description'] != null) {
+          desc = responseData['description'].toString();
+        }
+
+        if (statusCode == 409) {
+          logger.warn(
+            'Bot',
+            '⚠️ 409 冲突：检测到此 Bot Token 正在其他地方被使用（例如手机 Termux、电脑后台仍有运行中的 Python 脚本，或旧连接尚未断开）。同一 Token 只能有一个活跃实例！[5秒后重试]',
+          );
+          await Future.delayed(const Duration(seconds: 5));
+        } else {
+          final errorMsg = desc ?? (de.message != null && de.message!.isNotEmpty ? de.message! : '网络请求失败');
+          logger.warn('Bot', '网络轮询波动 ($errorMsg) [2秒后重试]');
+          await Future.delayed(const Duration(seconds: 2));
+        }
       } catch (e) {
         if (!_isRunning) break;
         logger.error('Bot', '轮询异常: $e');

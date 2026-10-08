@@ -65,7 +65,10 @@ class HomePage extends StatelessWidget {
       context: context,
       applicationName: 'TGBot Hub',
       applicationVersion: '1.0.0 (Flutter Android)',
-      applicationIcon: const Icon(Icons.smart_toy_rounded, size: 40, color: Colors.blue),
+      applicationIcon: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.asset('assets/images/app_logo.png', width: 48, height: 48),
+      ),
       children: const [
         Text('专为安卓备用机打造的 Telegram 机器人 7×24 小时后台运行工作站。'),
         SizedBox(height: 8),
@@ -84,16 +87,13 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.smart_toy_rounded,
-                size: 20,
-                color: theme.colorScheme.primary,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/images/app_logo.png',
+                width: 30,
+                height: 30,
+                fit: BoxFit.cover,
               ),
             ),
             const SizedBox(width: 10),

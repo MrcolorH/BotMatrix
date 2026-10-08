@@ -8,6 +8,7 @@
 
 ```text
 TGBot/
+├── apk/               # 📦 已编译的独立 Android 安装包 (包含 64 位与 32 位精简版)
 ├── python_version/    # 🐍 Python 命令行 / Termux 守护进程版 (轻量脚本，ADB/Termux 部署)
 ├── flutter_version/   # 📱 Flutter 安卓独立 App 版 (带图形界面，插槽式服务拓展，一键打包 APK)
 ├── LICENSE            # 开源许可证 (MIT)

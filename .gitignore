@@ -16,3 +16,9 @@ bot.log
 # Build & APK
 *.apk
 .DS_Store
+
+# Flutter / Dart
+**/.dart_tool/
+**/build/
+**/.pub-cache/
+**/.pub/

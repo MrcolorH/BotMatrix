@@ -266,14 +266,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     author = html.escape(raw_author)
     caption_title = html.escape(raw_title)
     title_display = f"\n💬 <b>推文内容</b>: {caption_title}\n" if caption_title else ""
-    safe_filename = html.escape(custom_filename)
 
     reply_content = (
         f"🎬 <b>Twitter 视频解析完成</b>\n\n"
         f"👤 <b>发布者</b>: @{author}\n"
         f"📺 <b>最高分辨率</b>: <code>{resolution}</code>\n"
         f"📦 <b>视频大小</b>: <code>{size_str}</code>\n"
-        f"📁 <b>建议文件名（点击复制）</b>:\n<code>{safe_filename}</code>\n"
         f"{title_display}"
     )
 

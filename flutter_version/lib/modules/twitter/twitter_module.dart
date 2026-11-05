@@ -172,14 +172,12 @@ class TwitterModule extends BotServiceModule {
     // 构建回复文本
     final safeAuthor = _escapeHtml(result.author);
     final safeTitle = _escapeHtml(result.title);
-    final safeFilename = _escapeHtml(customFilename);
 
     final replyContent = StringBuffer();
     replyContent.writeln('🎬 <b>Twitter 视频解析完成</b>\n');
     replyContent.writeln('👤 <b>发布者</b>: @$safeAuthor');
     replyContent.writeln('📺 <b>最高分辨率</b>: <code>${result.resolution}</code>');
     replyContent.writeln('📦 <b>视频大小</b>: <code>$sizeStr</code>');
-    replyContent.writeln('📁 <b>建议文件名（点击复制）</b>:\n<code>$safeFilename</code>');
     if (safeTitle.isNotEmpty) {
       replyContent.writeln('\n💬 <b>推文内容</b>: $safeTitle');
     }

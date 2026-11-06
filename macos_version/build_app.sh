@@ -109,6 +109,34 @@ mkdir -p "$DMG_ROOT"
 cp -R "$APP_BUNDLE" "$DMG_ROOT/"
 ln -s /Applications "$DMG_ROOT/Applications"
 
+# 内置一键解除 macOS Gatekeeper 隔离与损坏提示的辅助脚本
+cat << 'EOF_FIX' > "$DMG_ROOT/⚠️若提示已损坏打不开请双击我.command"
+#!/usr/bin/env bash
+cd "$(dirname "$0")"
+clear
+echo "=========================================================="
+echo "   BotMatrix - macOS 门禁隔离解除与运行权限修复工具"
+echo "=========================================================="
+echo "正在为 /Applications/BotMatrix.app 解除系统隔离标记..."
+
+if [ ! -d "/Applications/BotMatrix.app" ]; then
+    echo "⚠️ 未在「应用程序」目录找到 BotMatrix.app。"
+    echo "💡 请先将窗口左侧的 BotMatrix 拖入右侧 Applications 目录后再运行此工具。"
+    echo ""
+    read -p "按回车键退出..."
+    exit 1
+fi
+
+xattr -cr "/Applications/BotMatrix.app" 2>/dev/null || true
+chmod -R 755 "/Applications/BotMatrix.app" 2>/dev/null || true
+
+echo "✅ 修复成功！已解除 macOS 隔离与损坏提示限制。"
+echo "🚀 正在为您启动 BotMatrix..."
+open "/Applications/BotMatrix.app"
+exit 0
+EOF_FIX
+chmod +x "$DMG_ROOT/⚠️若提示已损坏打不开请双击我.command"
+
 DMG_FILE="$BUILD_DIR/${APP_NAME}_macOS_v${VERSION}.dmg"
 rm -f "$DMG_FILE"
 hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG_FILE"

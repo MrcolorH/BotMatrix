@@ -2,26 +2,29 @@
 set -e
 
 # ========================================================
-# TGBot for macOS 一键编译与应用打包脚本
+# BotMatrix for macOS 一键编译、签名与全能安装包打包脚本
+# 支持生成 .app、.dmg 拖拽镜像包与 .pkg 引导式系统安装包
 # ========================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-APP_NAME="TGBot"
+APP_NAME="BotMatrix"
+VERSION="1.3.0"
+VERSION_CODE="130"
 BUILD_DIR="$SCRIPT_DIR/build"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
 RESOURCES_DIR="$CONTENTS_DIR/Resources"
 
-echo "🚀 [1/4] 正在编译 Release 版本 (Swift & SwiftUI 原生架构)..."
+echo "🚀 [1/5] 正在编译 Release 版本 (Swift 6 & SwiftUI 原生架构)..."
 swift build -c release
 
-BIN_PATH="$SCRIPT_DIR/.build/arm64-apple-macosx/release/$APP_NAME"
+BIN_PATH="$SCRIPT_DIR/.build/arm64-apple-macosx/release/TGBot"
 if [ ! -f "$BIN_PATH" ]; then
     # 兜底查找通用 release 路径
-    BIN_PATH=$(find "$SCRIPT_DIR/.build" -type f -name "$APP_NAME" -perm +111 | grep "release" | head -n 1)
+    BIN_PATH=$(find "$SCRIPT_DIR/.build" -type f -name "TGBot" -perm +111 | grep "release" | head -n 1)
 fi
 
 if [ ! -f "$BIN_PATH" ]; then
@@ -29,11 +32,11 @@ if [ ! -f "$BIN_PATH" ]; then
     exit 1
 fi
 
-echo "📦 [2/4] 正在组装 macOS .app 应用程序包..."
+echo "📦 [2/5] 正在组装 macOS .app 应用程序包 ($APP_NAME.app)..."
 rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-# 复制二进制
+# 复制二进制并重命名为主程序名
 cp "$BIN_PATH" "$MACOS_DIR/$APP_NAME"
 chmod +x "$MACOS_DIR/$APP_NAME"
 
@@ -43,7 +46,7 @@ if [ -f "$SCRIPT_DIR/Resources/AppIcon.icns" ]; then
 fi
 
 # 生成 Info.plist
-cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
+cat << EOF > "$CONTENTS_DIR/Info.plist"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -51,21 +54,21 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleExecutable</key>
-    <string>TGBot</string>
+    <string>$APP_NAME</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
-    <string>com.mrcolorh.tgbot</string>
+    <string>com.mrcolorh.botmatrix</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>TGBot</string>
+    <string>$APP_NAME</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.3.0</string>
+    <string>$VERSION</string>
     <key>CFBundleVersion</key>
-    <string>130</string>
+    <string>$VERSION_CODE</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHighResolutionCapable</key>
@@ -84,21 +87,46 @@ EOF
 # 生成 PkgInfo
 echo -n "APPL????" > "$CONTENTS_DIR/PkgInfo"
 
-echo "🔐 [3/4] 正在对应用包进行本机 Ad-hoc 代码签名..."
+echo "🔐 [3/5] 正在对应用包进行本机 Ad-hoc 代码签名..."
 codesign --force --deep --sign - "$APP_BUNDLE" 2>/dev/null || true
 
-echo "✨ [4/4] 打包圆满完成！"
-echo "--------------------------------------------------------"
-echo "🎉 应用程序路径: $APP_BUNDLE"
-
-# 若系统 /Applications 中已有安装，自动同步覆盖更新
+# 同步覆盖本地 /Applications
 if [ -d "/Applications/$APP_NAME.app" ]; then
-    echo "🔄 检测到 /Applications/$APP_NAME.app，正在自动同步覆盖更新..."
     rm -rf "/Applications/$APP_NAME.app"
-    cp -R "$APP_BUNDLE" "/Applications/$APP_NAME.app"
-    echo "✅ 已成功覆盖更新至 /Applications/$APP_NAME.app！"
+fi
+cp -R "$APP_BUNDLE" "/Applications/$APP_NAME.app"
+echo "✅ 本地已同步更新至 /Applications/$APP_NAME.app"
+
+# 若旧名 TGBot.app 存在，清理旧名
+if [ -d "/Applications/TGBot.app" ]; then
+    rm -rf "/Applications/TGBot.app"
 fi
 
-echo "💡 您可以直接在终端执行以下命令运行它："
-echo "   open \"/Applications/$APP_NAME.app\""
+echo "💿 [4/5] 正在生成 macOS 标准 DMG 拖拽安装镜像 (Disk Image)..."
+DMG_ROOT="$BUILD_DIR/dmg_root"
+rm -rf "$DMG_ROOT"
+mkdir -p "$DMG_ROOT"
+cp -R "$APP_BUNDLE" "$DMG_ROOT/"
+ln -s /Applications "$DMG_ROOT/Applications"
+
+DMG_FILE="$BUILD_DIR/${APP_NAME}_macOS_v${VERSION}.dmg"
+rm -f "$DMG_FILE"
+hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG_FILE"
+rm -rf "$DMG_ROOT"
+echo "✅ DMG 磁盘镜像包已生成: $DMG_FILE"
+
+echo "📦 [5/5] 正在生成 macOS 官方引导式安装包 (.pkg) 与通用分发压缩包 (.zip)..."
+PKG_FILE="$BUILD_DIR/${APP_NAME}_macOS_v${VERSION}.pkg"
+rm -f "$PKG_FILE"
+pkgbuild --install-location "/Applications/$APP_NAME.app" --component "$APP_BUNDLE" "$PKG_FILE"
+echo "✅ PKG 系统向导安装包已生成: $PKG_FILE"
+
+ZIP_FILE="$BUILD_DIR/${APP_NAME}_macOS_v${VERSION}.zip"
+rm -f "$ZIP_FILE"
+(cd "$BUILD_DIR" && zip -r -y -q "$(basename "$ZIP_FILE")" "$APP_NAME.app")
+echo "✅ ZIP 绿色免安装包已生成: $ZIP_FILE"
+
+echo "--------------------------------------------------------"
+echo "🎉 全部安装包构建圆满完成！生成列表："
+ls -lh "$DMG_FILE" "$PKG_FILE" "$ZIP_FILE"
 echo "--------------------------------------------------------"

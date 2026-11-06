@@ -26,8 +26,11 @@
   - 展开状态下默认 **5 分钟** 无操作，Bot 后台自动调用 API 抹除文案并折叠，即使忘记关闭也不会留下任何痕迹。
 
 ### 3. 🤖 Mac mini 本地反重力 (AGY) CLI 远程调度（管理员私有）
+> [!IMPORTANT]
+> **魔法网络提示**：使用反重力 (AGY) 本地 AI 必须挂魔法（科学上网环境）。由于底层依赖 Google / Gemini 相关链路，请确保 Mac 本机已开启系统代理或 TUN 虚拟网卡模式，否则 AGY 命令会网络超时。
+
 - **远程派发指令**：
-  - 发送 `/ai <任务/问题>` 或 `/agy <任务>`，Telegram Bot 会在 Mac 本地后台调用 `~/.local/bin/agy -p "<prompt>"`，执行完毕后将结果格式化回传至 Telegram。
+  - 发送 `/ai <任务/问题>` 或 `/agy <任务>`，Telegram Bot 会在 Mac 本地后台调用 `~/.local/bin/agy -p "<prompt>"`，执行完毕后将结果格式化回传至 Telegram / QQ。
 - **Mac mini 宿主监控**：
   - 发送 `/status`，Bot 秒级生成并回传这台 Mac mini 的设备名、操作系统版本、开机运行时间（Uptime）、CPU 核数、内存占用、磁盘剩余空间与反重力状态。
 

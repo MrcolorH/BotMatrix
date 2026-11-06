@@ -12,6 +12,11 @@
 - 🍎 **macOS 原生控制中枢**：采用 Swift 6 & SwiftUI 纯原生打造，开箱支持 Telegram + QQ 双机器人并行接入、反重力 (AGY) 本地 AI 大模型对话调度、全网视频解析、晨报订阅、NapCat OneBot 框架无感集成与双模权限防护。
 - 📱 **Android 独立 App 版**：基于 Flutter 与原生 Android 前台服务构建，手机独立安装，7×24 小时后台保活运行，专注 Telegram 机器人的全网视频解析与交互。
 
+> [!IMPORTANT]
+> **🌐 网络环境提示（反重力 AI 与代理配置）**：
+> - **使用反重力 (AGY) AI 必须挂魔法**：由于 AGY 本地 AI 底层调用 Google / Gemini 相关大模型链路，**Mac 宿主机必须开启魔法 / 科学上网环境（推荐使用 Clash / Surge / Quantumult X 的 TUN 虚拟网卡模式或全局系统代理）**，否则 AGY CLI 无法连通服务并会出现超时报错。
+> - **海外平台与国内平台**：Telegram Bot 长轮询及 Twitter / YouTube 视频解析同样需走代理链路；QQ 机器人与中国大陆视频解析（Bilibili、抖音等）均原生支持国内直连。
+
 ---
 
 ## 📁 核心架构与仓库目录

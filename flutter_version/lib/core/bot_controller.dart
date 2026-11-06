@@ -152,6 +152,9 @@ class BotController extends ChangeNotifier {
   /// Telegram 消息轮询主循环
   Future<void> _runPollingLoop() async {
     int offset = 0;
+    bool hasPollingError = false;
+    int consecutiveErrorCount = 0;
+
     while (_isRunning && _client != null) {
       try {
         final updates = await _client!.getUpdates(
@@ -159,6 +162,13 @@ class BotController extends ChangeNotifier {
           timeout: 20,
           cancelToken: _cancelToken,
         );
+
+        // 如果此前出现过轮询报错或网络波动，本次恢复正常后打印一条成功日志
+        if (hasPollingError) {
+          hasPollingError = false;
+          consecutiveErrorCount = 0;
+          logger.success('Bot', '✅ 网络连接与消息轮询已恢复正常，正在持续监听中...');
+        }
 
         for (final update in updates) {
           offset = update.updateId + 1;
@@ -177,6 +187,10 @@ class BotController extends ChangeNotifier {
           break;
         }
 
+        hasPollingError = true;
+        consecutiveErrorCount++;
+        final shouldLog = consecutiveErrorCount == 1 || consecutiveErrorCount % 10 == 0;
+
         final statusCode = de.response?.statusCode;
         final responseData = de.response?.data;
         String? desc;
@@ -185,19 +199,29 @@ class BotController extends ChangeNotifier {
         }
 
         if (statusCode == 409) {
-          logger.warn(
-            'Bot',
-            '⚠️ 409 冲突：检测到此 Bot Token 正在其他地方被使用（例如手机 Termux、电脑后台仍有运行中的 Python 脚本，或旧连接尚未断开）。同一 Token 只能有一个活跃实例！[5秒后重试]',
-          );
+          if (shouldLog) {
+            logger.warn(
+              'Bot',
+              '⚠️ 409 冲突：检测到此 Bot Token 正在其他地方被使用。同一 Token 只能有一个活跃实例！[5秒后重试${consecutiveErrorCount > 1 ? "，连续第$consecutiveErrorCount次" : ""}]',
+            );
+          }
           await Future.delayed(const Duration(seconds: 5));
         } else {
-          final errorMsg = desc ?? (de.message != null && de.message!.isNotEmpty ? de.message! : '网络请求失败');
-          logger.warn('Bot', '网络轮询波动 ($errorMsg) [2秒后重试]');
+          if (shouldLog) {
+            final errorMsg = desc ?? (de.message != null && de.message!.isNotEmpty ? de.message! : '网络请求失败');
+            logger.warn('Bot', '网络轮询波动 ($errorMsg) [2秒后重试${consecutiveErrorCount > 1 ? "，连续第$consecutiveErrorCount次" : ""}]');
+          }
           await Future.delayed(const Duration(seconds: 2));
         }
       } catch (e) {
         if (!_isRunning) break;
-        logger.error('Bot', '轮询异常: $e');
+        hasPollingError = true;
+        consecutiveErrorCount++;
+        final shouldLog = consecutiveErrorCount == 1 || consecutiveErrorCount % 10 == 0;
+
+        if (shouldLog) {
+          logger.error('Bot', '轮询异常: $e${consecutiveErrorCount > 1 ? " (连续第$consecutiveErrorCount次)" : ""}');
+        }
         await Future.delayed(const Duration(seconds: 3));
       }
     }

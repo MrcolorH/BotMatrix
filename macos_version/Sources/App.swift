@@ -56,7 +56,7 @@ struct TGBotApp: App {
 
             Divider()
 
-            // QQ 小号状态
+            // QQ 账号状态
             HStack {
                 Text(qqController.isRunning ? (qqController.isConnected ? "🟢 QQ: 已连接 (\(qqController.displayName))" : "🟡 QQ: 正在连接本地终端...") : "⚪️ QQ: 未启动")
             }

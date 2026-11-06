@@ -7,7 +7,7 @@ public final class AgyService {
 
     /// 执行反重力 (AGY) CLI 命令并获取输出 (防死锁并发流式读取 + 角色卡人设注入 + 独立会话隔离记忆 + 双模权限隔离)
     /// - Parameters:
-    ///   - isMasterAdmin: true 为真实管理员(宿主真机读写权限)；false 为普通白名单(严格沙箱物理隔离，严禁触碰宿主机)
+    ///   - isMasterAdmin: true 为系统所有者(宿主真机读写权限)；false 为普通白名单(严格沙箱物理隔离，严禁触碰宿主机)
     public func executePrompt(
         _ prompt: String,
         sessionKey: String? = nil,
@@ -55,7 +55,7 @@ public final class AgyService {
 
             【🛡️ 运行环境安全隔离约束（普通访客沙箱模式）】
             你当前正运行在严格隔离的访客专属临时沙箱目录中（\(userSandbox.path)）。
-            本会话来自普通授权成员，绝非本机真实管理员（非设备主人）。
+            本会话来自普通授权成员，绝非本机系统所有者（非设备 Owner）。
             1. 严禁以任何方式读取、查看、篡改、删除或列出 Mac mini 宿主机上的任何个人文件、桌面、文档、代码库或系统敏感凭据（如 .ssh、密钥、密码等）。
             2. 严禁执行任何针对宿主系统的系统级控制、破坏性操作或宿主网络穿透。
             3. 所有代码测试和临时文件写入必须且只能在当前隔离沙箱内进行。
@@ -81,12 +81,37 @@ public final class AgyService {
             }
         }
 
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy年MM月dd日 HH:mm (EEEE)"
+        dateFormatter.locale = Locale(identifier: "zh_CN")
+        dateFormatter.timeZone = TimeZone.current
+        let currentTimeString = dateFormatter.string(from: Date())
+
+        let timeAndSearchGuard = """
+
+        【⏳ 宿主真实时间与实时联网搜索准则】
+        1. 当前宿主真实时间基准：\(currentTimeString)。
+        2. 你的离线知识库截断在较早时期。对于任何具有时效性、最新版本、实时动态的问题，包括但不限于：
+           - 游戏当前最新版本、最新魔神/主线剧情、版本活动与新角色（如《原神》、《崩坏：星穹铁道》等，切勿误以为还在旧版本时代）；
+           - 实时新闻、近期热点、当前日期与节假日；
+           - 最新科技产品发布、最新软件库版本与技术动态；
+           严禁仅凭过去离线记忆猜测或臆断。你拥有反重力完整的实时联网工具能力，请主动使用联网搜索工具（如 search_web 等）进行实时检索查证，确保获取并基于当下的真实资讯作答。
+        """
+
         if !persona.isEmpty || !historyContext.isEmpty || !sandboxGuard.isEmpty {
             promptToSend = """
             【系统人设与角色卡：\(activeCard.name)】
             \(persona)
             \(historyContext)
+            \(timeAndSearchGuard)
             \(sandboxGuard)
+
+            【用户提问/任务指令】
+            \(prompt)
+            """
+        } else {
+            promptToSend = """
+            \(timeAndSearchGuard)
 
             【用户提问/任务指令】
             \(prompt)
@@ -105,7 +130,7 @@ public final class AgyService {
                 var env = ProcessInfo.processInfo.environment
 
                 if isMasterAdmin {
-                    // 👑 真实管理员 (宿主真机模式)：具备设备读写与系统管理权限
+                    // 👑 系统所有者 (宿主真机模式)：具备设备最高读写与系统管理权限
                     process.arguments = [
                         "-p", promptToSend,
                         "--dangerously-skip-permissions",
@@ -125,10 +150,11 @@ public final class AgyService {
                 }
 
                 // 统一注入基础环境与反重力运行环境 (HOME 维持指向宿主根目录以读取本机已有 OAuth 授权态，避免弹出浏览器二次登录)
-                env["HOME"] = NSHomeDirectory()
+                let userHome = NSHomeDirectory()
+                env["HOME"] = userHome
                 env["USER"] = NSUserName()
                 env["SHELL"] = "/bin/zsh"
-                env["PATH"] = "/Users/colorh/.local/bin:/Users/colorh/.gemini/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin"
+                env["PATH"] = "\(userHome)/.local/bin:\(userHome)/.gemini/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/Apple/usr/bin"
 
                 process.environment = env
 

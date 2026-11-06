@@ -30,7 +30,7 @@ public struct DashboardView: View {
                 // Telegram 主控卡片
                 telegramMasterCard
 
-                // 🐧 QQ 小号网关主控卡片
+                // 🐧 QQ 账号网关主控卡片
                 qqMasterCard
 
                 // 指标行
@@ -171,7 +171,7 @@ public struct DashboardView: View {
         )
     }
 
-    // MARK: - 2. 🐧 QQ 小号网关主控卡片
+    // MARK: - 2. 🐧 QQ 账号网关主控卡片
 
     private var qqMasterCard: some View {
         VStack(spacing: 16) {

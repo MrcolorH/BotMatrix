@@ -110,7 +110,8 @@ public final class DynamicScriptPlugin: BotServiceModule, ObservableObject {
                 env["TGBOT_CHAT_ID"] = "\(chatId)"
                 env["TGBOT_USERNAME"] = username
                 env["TGBOT_TEXT"] = rawText
-                env["PATH"] = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Users/colorh/.local/bin:/opt/homebrew/bin"
+                let userHome = NSHomeDirectory()
+                env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:\(userHome)/.local/bin:\(userHome)/.gemini/bin"
                 process.environment = env
                 process.currentDirectoryURL = currentDirURL
 

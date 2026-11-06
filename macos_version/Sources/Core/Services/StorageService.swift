@@ -27,11 +27,12 @@ public struct AppConfig: Codable {
     public var personaCards: [PersonaCard]?
     public var activePersonaId: String?
 
-    // 🐧 QQ 小号与双端模块独立开关配置
+    // 🐧 QQ 账号与双端模块独立开关配置
     public var qqBotEnabled: Bool
     public var qqWsUrl: String
     public var qqAdminIds: String
     public var qqMasterAdminIds: String
+    public var qqNicknames: [String: String]?
     public var qqManageDaemon: Bool
     public var qqLaunchCommand: String
     public var qqAccount: String
@@ -49,6 +50,20 @@ public struct AppConfig: Codable {
     public var sessionMaxTurns: Int
     public var sessionTimeoutMinutes: Int
 
+    public static var defaultAgyCliPath: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let candidates = [
+            "\(home)/.local/bin/agy",
+            "\(home)/.gemini/bin/agy",
+            "/usr/local/bin/agy",
+            "/opt/homebrew/bin/agy"
+        ]
+        for p in candidates where FileManager.default.isExecutableFile(atPath: p) {
+            return p
+        }
+        return "\(home)/.local/bin/agy"
+    }
+
     public init(
         botToken: String = "",
         twitterDownApiKey: String = "",
@@ -57,7 +72,7 @@ public struct AppConfig: Codable {
         agyModuleEnabled: Bool = true,
         adminUserIds: String = "",
         masterAdminIds: String = "",
-        agyCliPath: String = "/Users/colorh/.local/bin/agy",
+        agyCliPath: String = AppConfig.defaultAgyCliPath,
         autoFoldMinutes: Int = 3,
         agyPersona: String = "你是一个贴心、聪明且幽默的私人 AI 助理。回答生动自然，直接切中要害，避免冗长套话。",
         agyEffort: String = "low",
@@ -67,9 +82,10 @@ public struct AppConfig: Codable {
         qqWsUrl: String = "ws://127.0.0.1:3001",
         qqAdminIds: String = "",
         qqMasterAdminIds: String = "",
+        qqNicknames: [String: String]? = nil,
         qqManageDaemon: Bool = true,
         qqLaunchCommand: String = "/Applications/QQ.app/Contents/MacOS/QQ",
-        qqAccount: String = "3178629006",
+        qqAccount: String = "",
         qqPassword: String = "",
         qqAutoQuickLogin: Bool = true,
         videoEnabledTG: Bool = true,
@@ -98,6 +114,7 @@ public struct AppConfig: Codable {
         self.qqWsUrl = qqWsUrl
         self.qqAdminIds = qqAdminIds
         self.qqMasterAdminIds = qqMasterAdminIds
+        self.qqNicknames = qqNicknames
         self.qqManageDaemon = qqManageDaemon
         self.qqLaunchCommand = qqLaunchCommand
         self.qqAccount = qqAccount
@@ -122,7 +139,7 @@ public struct AppConfig: Codable {
         self.agyModuleEnabled = try container.decodeIfPresent(Bool.self, forKey: .agyModuleEnabled) ?? true
         self.adminUserIds = try container.decodeIfPresent(String.self, forKey: .adminUserIds) ?? ""
         self.masterAdminIds = try container.decodeIfPresent(String.self, forKey: .masterAdminIds) ?? ""
-        self.agyCliPath = try container.decodeIfPresent(String.self, forKey: .agyCliPath) ?? "/Users/colorh/.local/bin/agy"
+        self.agyCliPath = try container.decodeIfPresent(String.self, forKey: .agyCliPath) ?? AppConfig.defaultAgyCliPath
         self.autoFoldMinutes = try container.decodeIfPresent(Int.self, forKey: .autoFoldMinutes) ?? 3
         self.agyPersona = try container.decodeIfPresent(String.self, forKey: .agyPersona) ?? "你是一个贴心、聪明且幽默的私人 AI 助理。回答生动自然，直接切中要害，避免冗长套话。"
         self.agyEffort = try container.decodeIfPresent(String.self, forKey: .agyEffort) ?? "low"
@@ -134,9 +151,10 @@ public struct AppConfig: Codable {
         self.qqWsUrl = try container.decodeIfPresent(String.self, forKey: .qqWsUrl) ?? "ws://127.0.0.1:3001"
         self.qqAdminIds = try container.decodeIfPresent(String.self, forKey: .qqAdminIds) ?? ""
         self.qqMasterAdminIds = try container.decodeIfPresent(String.self, forKey: .qqMasterAdminIds) ?? ""
+        self.qqNicknames = try container.decodeIfPresent([String: String].self, forKey: .qqNicknames)
         self.qqManageDaemon = try container.decodeIfPresent(Bool.self, forKey: .qqManageDaemon) ?? true
         self.qqLaunchCommand = try container.decodeIfPresent(String.self, forKey: .qqLaunchCommand) ?? "/Applications/QQ.app/Contents/MacOS/QQ"
-        self.qqAccount = try container.decodeIfPresent(String.self, forKey: .qqAccount) ?? "3178629006"
+        self.qqAccount = try container.decodeIfPresent(String.self, forKey: .qqAccount) ?? ""
         self.qqPassword = try container.decodeIfPresent(String.self, forKey: .qqPassword) ?? ""
         self.qqAutoQuickLogin = try container.decodeIfPresent(Bool.self, forKey: .qqAutoQuickLogin) ?? true
 
@@ -154,6 +172,7 @@ public struct AppConfig: Codable {
 
 public final class StorageService: ObservableObject {
     public static let shared = StorageService()
+    public static var defaultAgyCliPath: String { AppConfig.defaultAgyCliPath }
 
     private let configUrl: URL = {
         let home = URL(fileURLWithPath: NSHomeDirectory())
@@ -185,11 +204,12 @@ public final class StorageService: ObservableObject {
         }
     }
 
-    // 🐧 QQ 小号与独立开关
+    // 🐧 QQ 账号与独立开关
     @Published public var qqBotEnabled: Bool { didSet { persist() } }
     @Published public var qqWsUrl: String { didSet { persist() } }
     @Published public var qqAdminIds: String { didSet { persist() } }
     @Published public var qqMasterAdminIds: String { didSet { persist() } }
+    @Published public var qqNicknames: [String: String] { didSet { persist() } }
     @Published public var qqManageDaemon: Bool { didSet { persist() } }
     @Published public var qqLaunchCommand: String { didSet { persist() } }
     @Published public var qqAccount: String { didSet { persist() } }
@@ -285,9 +305,12 @@ public final class StorageService: ObservableObject {
 
         // 默认检测可用 agy
         if !FileManager.default.isExecutableFile(atPath: initialConfig.agyCliPath) {
+            let userHome = FileManager.default.homeDirectoryForCurrentUser.path
             let possibleAgy = [
-                "/Users/colorh/.local/bin/agy",
-                "/Users/colorh/.gemini/bin/agy"
+                "\(userHome)/.local/bin/agy",
+                "\(userHome)/.gemini/bin/agy",
+                "/usr/local/bin/agy",
+                "/opt/homebrew/bin/agy"
             ]
             for p in possibleAgy where FileManager.default.isExecutableFile(atPath: p) {
                 initialConfig.agyCliPath = p
@@ -312,9 +335,10 @@ public final class StorageService: ObservableObject {
         self.qqWsUrl = initialConfig.qqWsUrl.isEmpty ? "ws://127.0.0.1:3001" : initialConfig.qqWsUrl
         self.qqAdminIds = initialConfig.qqAdminIds
         self.qqMasterAdminIds = initialConfig.qqMasterAdminIds
+        self.qqNicknames = initialConfig.qqNicknames ?? [:]
         self.qqManageDaemon = initialConfig.qqManageDaemon
         self.qqLaunchCommand = initialConfig.qqLaunchCommand.isEmpty ? "/Applications/QQ.app/Contents/MacOS/QQ" : initialConfig.qqLaunchCommand
-        self.qqAccount = initialConfig.qqAccount.isEmpty ? "3178629006" : initialConfig.qqAccount
+        self.qqAccount = initialConfig.qqAccount
         self.qqPassword = initialConfig.qqPassword
         self.qqAutoQuickLogin = initialConfig.qqAutoQuickLogin
         self.videoEnabledTG = initialConfig.videoEnabledTG
@@ -373,6 +397,7 @@ public final class StorageService: ObservableObject {
             qqWsUrl: qqWsUrl,
             qqAdminIds: qqAdminIds,
             qqMasterAdminIds: qqMasterAdminIds,
+            qqNicknames: qqNicknames,
             qqManageDaemon: qqManageDaemon,
             qqLaunchCommand: qqLaunchCommand,
             qqAccount: qqAccount,
@@ -468,7 +493,7 @@ public final class StorageService: ObservableObject {
 
     // MARK: - Telegram 管理员鉴权
 
-    /// 👑 TG 真实管理员 (拥有 Mac 宿主真机读写与运维权限)
+    /// 👑 TG 系统所有者 (拥有 Mac 宿主真机读写与运维权限)
     public var masterAdminList: [Int64] {
         let trimmed = masterAdminIds.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return [] }
@@ -520,32 +545,49 @@ public final class StorageService: ObservableObject {
         adminUserIds = current.map { "\($0)" }.joined(separator: ", ")
     }
 
-    // MARK: - 🐧 QQ 管理员鉴权 (分级权限：真机管理员 vs 沙箱白名单)
+    // MARK: - 🐧 QQ 鉴权 (分级权限：系统所有者 vs 沙箱白名单)
 
-    /// 👑 QQ 真实管理员 (账号所有人 - 拥有 Mac 宿主真机读写与运维权限)
+    /// 👑 QQ 系统所有者 (唯一宿主 - 拥有 Mac 宿主真机最高读写与运维权限)
     public var qqMasterAdminList: [Int64] {
         let trimmed = qqMasterAdminIds.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return [] }
-        return trimmed.components(separatedBy: CharacterSet(charactersIn: ",;， \n\t"))
-            .compactMap { Int64($0.trimmingCharacters(in: .whitespaces)) }
+        if let first = trimmed.components(separatedBy: CharacterSet(charactersIn: ",;， \n\t"))
+            .compactMap({ Int64($0.trimmingCharacters(in: .whitespaces)) })
+            .first {
+            return [first]
+        }
+        return []
     }
 
     public func isQQMasterAdmin(userId: Int64) -> Bool {
         return qqMasterAdminList.contains(userId)
     }
 
+    /// 设置唯一系统所有者 (主人仅限一位)
     public func addQQMasterAdmin(id: Int64) {
-        var current = qqMasterAdminList
-        if !current.contains(id) {
-            current.append(id)
-            qqMasterAdminIds = current.map { "\($0)" }.joined(separator: ", ")
-        }
+        qqMasterAdminIds = "\(id)"
     }
 
+    /// 移除系统所有者
     public func removeQQMasterAdmin(id: Int64) {
-        var current = qqMasterAdminList
-        current.removeAll { $0 == id }
-        qqMasterAdminIds = current.map { "\($0)" }.joined(separator: ", ")
+        qqMasterAdminIds = ""
+    }
+
+    /// 获取缓存的 QQ 昵称
+    public func getQQNickname(userId: Int64) -> String? {
+        return qqNicknames[String(userId)]
+    }
+
+    /// 缓存或更新 QQ 昵称
+    public func setQQNickname(userId: Int64, nickname: String) {
+        let trimmed = nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        var current = qqNicknames
+        if trimmed.isEmpty {
+            current.removeValue(forKey: String(userId))
+        } else {
+            current[String(userId)] = trimmed
+        }
+        qqNicknames = current
     }
 
     /// 🛡️ QQ 普通白名单 (沙箱安全隔离模式 - 绝不允许触碰本机任何文件)
@@ -557,7 +599,7 @@ public final class StorageService: ObservableObject {
     }
 
     public func isQQAdmin(userId: Int64) -> Bool {
-        // 真实管理员自动拥有访问权限
+        // 系统所有者自动拥有访问权限
         if isQQMasterAdmin(userId: userId) { return true }
         // 如果白名单为空，则默认不放行陌生人保护算力
         if qqAdminList.isEmpty { return false }
@@ -581,8 +623,7 @@ public final class StorageService: ObservableObject {
     public func tryImportFromEnvFile() {
         let possiblePaths = [
             ".env",
-            "../python_version/.env",
-            "python_version/.env",
+            "../.env",
             NSHomeDirectory() + "/.env"
         ]
 

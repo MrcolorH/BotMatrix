@@ -95,7 +95,7 @@ public final class AgyModule: BotServiceModule, ObservableObject {
             if cmd == "start" || cmd == "help" {
                 let adminHelp = isMaster ? """
 
-                👑 <b>真实管理员专属功能已激活 (真机宿主模式):</b>
+                👑 <b>系统所有者专属功能已激活 (真机宿主模式):</b>
                 • 直接向我发送任何文本即可开启 AI 对话并具备真机设备读写与维护能力
                 • <code>/quota</code> - 实时查询反重力 AI 5小时与周额度余额
                 • <code>/persona</code> - 查看当前生效的 AI 角色卡
@@ -136,27 +136,27 @@ public final class AgyModule: BotServiceModule, ObservableObject {
                 return
             }
 
-            // 管理员专享指令：/status (仅限真实管理员)
+            // 专享指令：/status (仅限系统所有者)
             if cmd == "status" {
                 guard isMaster else {
-                    let denied = "⛔️ <b>权限受限</b>：Mac mini 宿主系统硬件与运行状态仅限真实管理员（设备主人）查看。您当前处于白名单沙箱隔离模式。"
+                    let denied = "⛔️ <b>权限受限</b>：Mac mini 宿主系统硬件与运行状态仅限系统所有者（Owner）查看。您当前处于白名单沙箱隔离模式。"
                     _ = try? await client.sendMessage(chatId: chatId, text: denied, parseMode: "HTML")
                     return
                 }
-                logger.info("Agy", "真实管理员 [\(userTag)] 查询 Mac mini 系统状态")
+                logger.info("Agy", "系统所有者 [\(userTag)] 查询 Mac mini 系统状态")
                 let statusText = await agyService.getMacSystemStatus()
                 _ = try? await client.sendMessage(chatId: chatId, text: statusText, parseMode: "HTML")
                 return
             }
 
-            // 管理员专享指令：/quota, /limit, /usage, /ed, /edu (仅限真实管理员)
+            // 专享指令：/quota, /limit, /usage, /ed, /edu (仅限系统所有者)
             if cmd == "quota" || cmd == "limit" || cmd == "usage" || cmd == "ed" || cmd == "edu" {
                 guard isMaster else {
-                    let denied = "⛔️ <b>权限受限</b>：反重力 AI 额度查询仅限真实管理员查看。"
+                    let denied = "⛔️ <b>权限受限</b>：反重力 AI 额度查询仅限系统所有者（Owner）查看。"
                     _ = try? await client.sendMessage(chatId: chatId, text: denied, parseMode: "HTML")
                     return
                 }
-                logger.info("Agy", "真实管理员 [\(userTag)] 查询反重力 AI 额度")
+                logger.info("Agy", "系统所有者 [\(userTag)] 查询反重力 AI 额度")
                 let report = await agyService.getAgyQuotaReport()
                 _ = try? await client.sendMessage(chatId: chatId, text: report, parseMode: "HTML")
                 return
@@ -196,7 +196,7 @@ public final class AgyModule: BotServiceModule, ObservableObject {
         client: TelegramClient,
         logger: LogService
     ) async {
-        let roleDesc = isMaster ? "👑 真实管理员(宿主模式)" : "🛡️ 白名单访客(沙箱模式)"
+        let roleDesc = isMaster ? "👑 系统所有者(宿主模式)" : "🛡️ 白名单访客(沙箱模式)"
         logger.info("Agy", "用户 [\(userTag)][\(roleDesc)] 发起对话: \(prompt.prefix(40))...")
 
         // 1. 发送拟人化输入状态 (sendChatAction)

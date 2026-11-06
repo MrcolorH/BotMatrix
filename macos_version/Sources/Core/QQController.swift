@@ -18,6 +18,21 @@ public struct QQPermissionRequest: Codable, Identifiable, Equatable {
     }
 }
 
+public struct QQFriendRequest: Codable, Identifiable, Equatable {
+    public var id: String { flag.isEmpty ? "\(userId)" : flag }
+    public var userId: Int64
+    public var comment: String
+    public var flag: String
+    public var requestedAt: Date
+
+    public init(userId: Int64, comment: String, flag: String, requestedAt: Date = Date()) {
+        self.userId = userId
+        self.comment = comment
+        self.flag = flag
+        self.requestedAt = requestedAt
+    }
+}
+
 @MainActor
 public final class QQController: ObservableObject {
     public static let shared = QQController()
@@ -45,7 +60,10 @@ public final class QQController: ObservableObject {
     @Published public private(set) var qrCodeUrl: String = ""
     @Published public private(set) var isQrCodeAccepted: Bool = false
 
-    // 📋 好友权限申请列表 (待真实管理员审批)
+    // 👥 好友申请列表 (待系统所有者审批)
+    @Published public private(set) var pendingFriendRequests: [QQFriendRequest] = []
+
+    // 📋 好友权限申请列表 (待系统所有者审批)
     @Published public private(set) var pendingRequests: [QQPermissionRequest] = []
 
     private let storage = StorageService.shared
@@ -64,8 +82,15 @@ public final class QQController: ObservableObject {
         return folder.appendingPathComponent("pending_qq_requests.json")
     }
 
+    private var pendingFriendRequestsUrl: URL {
+        let folder = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".tgbot", isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder.appendingPathComponent("pending_qq_friend_requests.json")
+    }
+
     public init() {
         loadPendingRequests()
+        loadPendingFriendRequests()
     }
 
     public var displayName: String {
@@ -73,9 +98,9 @@ public final class QQController: ObservableObject {
             return "\(botNickname) (\(botUin))"
         }
         if botUin > 0 {
-            return "QQ 小号 (\(botUin))"
+            return "QQ 账号 (\(botUin))"
         }
-        return "本地 QQ 小号网关"
+        return "本地 QQ 网关"
     }
 
     public var statusDescription: String {
@@ -113,7 +138,7 @@ public final class QQController: ObservableObject {
         startedAt = Date()
         startUptimeTimer()
 
-        logger.info("QQ", "正在启动 QQ 小号服务...")
+        logger.info("QQ", "正在启动 QQ 机器人服务...")
 
         monitorTask?.cancel()
         monitorTask = Task {
@@ -135,7 +160,7 @@ public final class QQController: ObservableObject {
         monitorTask?.cancel()
         monitorTask = nil
 
-        logger.info("QQ", "正在断开 QQ 小号网关并彻底停止守护进程...")
+        logger.info("QQ", "正在断开 QQ 网关并彻底停止守护进程...")
 
         // 停止计时
         uptimeTimer?.invalidate()
@@ -319,6 +344,11 @@ public final class QQController: ObservableObject {
                     storage.qqAccount = u
                 }
             }
+        }
+
+        // 连线成功后自动后台同步一下已设置管理员与白名单成员的昵称资料
+        Task { [weak self] in
+            await self?.refreshAllQQProfiles()
         }
     }
 
@@ -581,7 +611,7 @@ public final class QQController: ObservableObject {
             return (false, "您已经是白名单授权用户啦，可以直接和萌萌聊天喵~")
         }
         if pendingRequests.contains(where: { $0.userId == userId }) {
-            return (false, "您已经提交过申请啦，正在等待主人（真实管理员）审核中，请耐心等候喵~")
+            return (false, "您已经提交过申请啦，正在等待系统所有者审核中，请耐心等候喵~")
         }
 
         let req = QQPermissionRequest(userId: userId, senderName: senderName, requestedAt: Date(), note: note)
@@ -590,10 +620,10 @@ public final class QQController: ObservableObject {
 
         logger.info("QQ", "收到来自 [\(senderName)](\(userId)) 的 AI 聊天权限申请")
 
-        // 向所有真实管理员发送审批通知
+        // 向所有系统所有者发送审批通知
         let masterList = storage.qqMasterAdminList
         if masterList.isEmpty {
-            logger.warn("QQ", "收到权限申请，但当前未配置任何 QQ 真实管理员！")
+            logger.warn("QQ", "收到权限申请，但当前未配置任何 QQ 系统所有者！")
         } else {
             let formatter = DateFormatter()
             formatter.dateFormat = "MM-dd HH:mm"
@@ -615,10 +645,10 @@ public final class QQController: ObservableObject {
             }
         }
 
-        return (true, "📝 萌萌已经帮您向真实管理员（主人）提交申请啦！请稍等主人审核通过喵~")
+        return (true, "📝 萌萌已经帮您向系统所有者提交申请啦！请稍候审核喵~")
     }
 
-    /// 真实管理员批准申请 (加入普通白名单，受沙箱保护)
+    /// 系统所有者批准申请 (加入普通白名单，受沙箱保护)
     public func approveRequest(userId: Int64) async -> (success: Bool, message: String) {
         let req = pendingRequests.first(where: { $0.userId == userId })
         let targetName = req?.senderName ?? "\(userId)"
@@ -631,7 +661,7 @@ public final class QQController: ObservableObject {
 
         // 通知被批准的用户
         let welcomeMsg = """
-        🎉 您的 AI 聊天权限申请已获主人批准！
+        🎉 您的 AI 聊天权限申请已获系统所有者批准！
         现在您可以随时向萌萌发送消息开始聊天啦喵~
         （已为您接入独立安全沙箱运行环境）
         """
@@ -640,7 +670,7 @@ public final class QQController: ObservableObject {
         return (true, "✅ 已成功批准 \(targetName) (\(userId))，已加入普通白名单（沙箱隔离模式）！")
     }
 
-    /// 真实管理员拒绝申请
+    /// 系统所有者拒绝申请
     public func rejectRequest(userId: Int64) async -> (success: Bool, message: String) {
         let req = pendingRequests.first(where: { $0.userId == userId })
         let targetName = req?.senderName ?? "\(userId)"
@@ -651,10 +681,165 @@ public final class QQController: ObservableObject {
         logger.info("QQ", "已拒绝 [\(targetName)](\(userId)) 的权限申请")
 
         // 通知被拒绝的用户
-        let rejectMsg = "抱歉喵，主人暂未批准您的 AI 聊天权限申请。"
+        let rejectMsg = "抱歉喵，系统所有者暂未批准您的 AI 聊天权限申请。"
         try? await qqClient.sendPrivateMsg(userId: userId, text: rejectMsg)
 
         return (true, "❌ 已拒绝 \(targetName) (\(userId)) 的权限申请。")
+    }
+
+    // MARK: - 👥 好友添加申请管理
+
+    private func loadPendingFriendRequests() {
+        guard FileManager.default.fileExists(atPath: pendingFriendRequestsUrl.path),
+              let data = try? Data(contentsOf: pendingFriendRequestsUrl),
+              let list = try? JSONDecoder().decode([QQFriendRequest].self, from: data) else {
+            self.pendingFriendRequests = []
+            return
+        }
+        self.pendingFriendRequests = list
+    }
+
+    private func savePendingFriendRequests() {
+        if let data = try? JSONEncoder().encode(pendingFriendRequests) {
+            try? data.write(to: pendingFriendRequestsUrl, options: .atomic)
+        }
+    }
+
+    /// 处理加好友事件并转发给系统所有者
+    private func handleFriendRequestEvent(_ event: [String: Any]) async {
+        let userId: Int64
+        if let num = event["user_id"] as? NSNumber {
+            userId = num.int64Value
+        } else if let str = event["user_id"] as? String, let num = Int64(str) {
+            userId = num
+        } else {
+            userId = 0
+        }
+
+        guard userId > 0 else { return }
+
+        let comment = (event["comment"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let flag = (event["flag"] as? String ?? (event["flag"] as? NSNumber)?.stringValue ?? "")
+
+        let req = QQFriendRequest(userId: userId, comment: comment, flag: flag, requestedAt: Date())
+        if let idx = pendingFriendRequests.firstIndex(where: { $0.userId == userId || (!flag.isEmpty && $0.flag == flag) }) {
+            pendingFriendRequests[idx] = req
+        } else {
+            pendingFriendRequests.append(req)
+        }
+        savePendingFriendRequests()
+
+        logger.info("QQ", "收到来自 QQ [\(userId)] 的好友申请，附言: \(comment.isEmpty ? "(无)" : comment)")
+
+        // 转发给系统所有者审批
+        let masterList = storage.qqMasterAdminList
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd HH:mm"
+        let timeStr = formatter.string(from: req.requestedAt)
+        let commentDisplay = comment.isEmpty ? "(无附言)" : comment
+
+        let notifyText = """
+        🔔【收到新的 QQ 好友申请】
+        申请人 QQ：\(userId)
+        申请附言：\(commentDisplay)
+        申请时间：\(timeStr)
+
+        👉 极简审批：直接回复【同意】或【拒绝】
+        👉 引用审批：引用本条消息回复【同意】或【拒绝】
+        👉 精确审批：回复【同意好友 \(userId)】或【拒绝好友 \(userId)】
+        """
+
+        if masterList.isEmpty {
+            logger.warn("QQ", "收到好友申请，但当前未配置任何 QQ 系统所有者！请在 QQ 机器人设置中添加系统所有者。")
+        } else {
+            for masterId in masterList {
+                try? await qqClient.sendPrivateMsg(userId: masterId, text: notifyText)
+            }
+        }
+
+        // 同步通知 Telegram 系统所有者 (若 Telegram Bot 在线)
+        await BotController.shared.sendNotificationToMasterAdmins(text: notifyText)
+    }
+
+    /// 系统所有者同意好友申请
+    public func approveFriendRequest(userId: Int64) async -> (success: Bool, message: String) {
+        guard let req = pendingFriendRequests.first(where: { $0.userId == userId }) else {
+            return (false, "未找到 QQ [\(userId)] 的待处理好友申请")
+        }
+
+        // 1. 调用 OneBot API 同意添加好友
+        do {
+            try await qqClient.setFriendAddRequest(flag: req.flag, approve: true)
+        } catch {
+            logger.error("QQ", "调用同意好友 API 失败: \(error.localizedDescription)")
+        }
+
+        // 2. 自动将其加入普通沙箱白名单
+        storage.addQQAdmin(id: userId)
+
+        // 3. 移出队列并持久化
+        pendingFriendRequests.removeAll { $0.userId == userId }
+        savePendingFriendRequests()
+
+        logger.success("QQ", "系统所有者已同意 QQ [\(userId)] 的好友申请，已自动加入普通沙箱白名单")
+
+        // 4. 延迟向新好友发送欢迎消息
+        Task {
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            let welcome = """
+            🎉 系统所有者已同意您的好友申请！
+            我是部署在 Mac 上的智能助理萌萌，很高兴认识您喵~
+            您可以随时向我发送消息开始体验！
+            """
+            try? await qqClient.sendPrivateMsg(userId: userId, text: welcome)
+        }
+
+        return (true, "✅ 已成功同意 \(userId) 的好友申请，并已加入普通白名单（沙箱模式）！")
+    }
+
+    /// 系统所有者拒绝好友申请
+    public func rejectFriendRequest(userId: Int64) async -> (success: Bool, message: String) {
+        guard let req = pendingFriendRequests.first(where: { $0.userId == userId }) else {
+            return (false, "未找到 QQ [\(userId)] 的待处理好友申请")
+        }
+
+        // 1. 调用 OneBot API 拒绝好友申请
+        do {
+            try await qqClient.setFriendAddRequest(flag: req.flag, approve: false)
+        } catch {
+            logger.error("QQ", "调用拒绝好友 API 失败: \(error.localizedDescription)")
+        }
+
+        // 2. 移出队列并持久化
+        pendingFriendRequests.removeAll { $0.userId == userId }
+        savePendingFriendRequests()
+
+        logger.info("QQ", "系统所有者已拒绝 QQ [\(userId)] 的好友申请")
+
+        return (true, "❌ 已拒绝 \(userId) 的好友申请。")
+    }
+
+    // MARK: - QQ 资料同步与查询
+
+    /// 主动查询并缓存指定 QQ 账号的资料 (昵称)
+    public func fetchAndCacheQQUserInfo(userId: Int64) async -> String? {
+        if isConnected {
+            let (nick, _) = await qqClient.fetchStrangerInfo(userId: userId)
+            if let n = nick, !n.isEmpty {
+                storage.setQQNickname(userId: userId, nickname: n)
+                return n
+            }
+        }
+        return storage.getQQNickname(userId: userId)
+    }
+
+    /// 批量刷新当前所有管理员与白名单成员的资料
+    public func refreshAllQQProfiles() async {
+        guard isConnected else { return }
+        let allIds = Set(storage.qqMasterAdminList + storage.qqAdminList)
+        for id in allIds {
+            _ = await fetchAndCacheQQUserInfo(userId: id)
+        }
     }
 
     /// 处理 OneBot 事件报文
@@ -675,7 +860,16 @@ public final class QQController: ObservableObject {
             return
         }
 
-        // 2. 消息事件拦截处理
+        // 2. 好友申请 / 请求类事件拦截处理
+        if let postType = event["post_type"] as? String, postType == "request" {
+            let requestType = event["request_type"] as? String ?? ""
+            if requestType == "friend" {
+                await handleFriendRequestEvent(event)
+            }
+            return
+        }
+
+        // 3. 消息事件拦截处理
         guard let postType = event["post_type"] as? String, postType == "message" else { return }
 
         let messageType = event["message_type"] as? String ?? ""
@@ -707,6 +901,9 @@ public final class QQController: ObservableObject {
         }
 
         let sender = (event["sender"] as? [String: Any])?["nickname"] as? String ?? "\(userId)"
+        if !sender.isEmpty && userId > 0 && sender != "\(userId)" {
+            storage.setQQNickname(userId: userId, nickname: sender)
+        }
 
         guard !rawMessage.isEmpty else { return }
 
@@ -737,6 +934,7 @@ public final class QQController: ObservableObject {
     /// 从文本或引用消息中提取 QQ 号 (支持多种格式匹配)
     private func extractQQNumber(from text: String) -> Int64? {
         let patterns = [
+            #"申请人\s*QQ[：:]\s*(\d{5,12})"#,
             #"QQ\s*号码[：:]\s*(\d{5,12})"#,
             #"QQ[：:]\s*(\d{5,12})"#,
             #"\b(\d{5,12})\b"#
@@ -760,13 +958,13 @@ public final class QQController: ObservableObject {
 
         let isMaster = storage.isQQMasterAdmin(userId: userId)
         let isAdmin = storage.isQQAdmin(userId: userId)
-        let roleTag = isMaster ? "👑 真实管理员(宿主模式)" : "🛡️ 普通白名单(沙箱模式)"
+        let roleTag = isMaster ? "👑 系统所有者(宿主模式)" : "🛡️ 普通白名单(沙箱模式)"
 
         // 去除 CQ 码（如 [CQ:reply,id=123] 等），提取纯净命令文本
         let cleanText = text.replacingOccurrences(of: #"\s*\[CQ:[^\]]+\]\s*"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // 1. 真实管理员审批快捷判定 (支持极简回复【同意】/【拒绝】、引用回复【同意】/【拒绝】或带 QQ 号命令)
+        // 1. 系统所有者审批快捷判定 (支持极简回复【同意】/【拒绝】、引用回复【同意】/【拒绝】或带 QQ 号命令)
         if isMaster {
             let lower = cleanText.lowercased()
             let approveKeywords = ["同意", "通过", "批准", "准了", "准", "ok", "y", "yes", "1"]
@@ -780,31 +978,65 @@ public final class QQController: ObservableObject {
                 lower.hasPrefix("/reject") || lower.hasPrefix("/deny") ||
                 lower.hasPrefix("拒绝") || lower.hasPrefix("不同意") || lower.hasPrefix("驳回")
 
+            let isFriendApproval = cleanText.contains("好友") || (quotedText?.contains("好友申请") == true)
+
             if isApproveIntent {
-                // 解析目标 QQ：优先从消息文本提取，次选从引用回复消息中提取，最后取排队中的最新申请
                 var targetId: Int64? = extractQQNumber(from: cleanText)
                 if targetId == nil, let q = quotedText {
                     targetId = extractQQNumber(from: q)
                 }
-                if targetId == nil {
-                    if pendingRequests.count == 1 {
-                        targetId = pendingRequests.first?.userId
-                    } else if pendingRequests.count > 1 {
-                        targetId = pendingRequests.last?.userId
-                    } else {
-                        try? await qqClient.sendPrivateMsg(userId: userId, text: "当前暂无待审核的权限申请喵~")
-                        return
-                    }
-                }
 
-                if let tid = targetId {
-                    let res = await approveRequest(userId: tid)
+                // 1. 优先匹配待处理好友申请
+                if let tid = targetId, pendingFriendRequests.contains(where: { $0.userId == tid }) {
+                    let res = await approveFriendRequest(userId: tid)
                     var replyMsg = res.message
-                    if pendingRequests.count > 0 {
-                        replyMsg += "\n💡 当前仍有 \(pendingRequests.count) 条待审核申请，可回复 /pending 查看列表。"
+                    let remaining = pendingFriendRequests.count + pendingRequests.count
+                    if remaining > 0 {
+                        replyMsg += "\n💡 当前仍有 \(remaining) 条待审批事项，可回复 /pending 查看列表。"
                     }
                     try? await qqClient.sendPrivateMsg(userId: userId, text: replyMsg)
                     return
+                }
+
+                // 2. 匹配待处理 AI 聊天权限申请
+                if let tid = targetId, pendingRequests.contains(where: { $0.userId == tid }) {
+                    let res = await approveRequest(userId: tid)
+                    var replyMsg = res.message
+                    let remaining = pendingFriendRequests.count + pendingRequests.count
+                    if remaining > 0 {
+                        replyMsg += "\n💡 当前仍有 \(remaining) 条待审批事项，可回复 /pending 查看列表。"
+                    }
+                    try? await qqClient.sendPrivateMsg(userId: userId, text: replyMsg)
+                    return
+                }
+
+                // 3. 未明确指定 QQ 号时的智能队列判定
+                if targetId == nil {
+                    // 如果明确指明是好友申请，或者仅有好友申请在排队
+                    if (isFriendApproval || pendingRequests.isEmpty) && !pendingFriendRequests.isEmpty {
+                        let tid = pendingFriendRequests.last!.userId
+                        let res = await approveFriendRequest(userId: tid)
+                        var replyMsg = res.message
+                        let remaining = pendingFriendRequests.count + pendingRequests.count
+                        if remaining > 0 {
+                            replyMsg += "\n💡 当前仍有 \(remaining) 条待审批事项，可回复 /pending 查看列表。"
+                        }
+                        try? await qqClient.sendPrivateMsg(userId: userId, text: replyMsg)
+                        return
+                    } else if !pendingRequests.isEmpty {
+                        let tid = pendingRequests.last!.userId
+                        let res = await approveRequest(userId: tid)
+                        var replyMsg = res.message
+                        let remaining = pendingFriendRequests.count + pendingRequests.count
+                        if remaining > 0 {
+                            replyMsg += "\n💡 当前仍有 \(remaining) 条待审批事项，可回复 /pending 查看列表。"
+                        }
+                        try? await qqClient.sendPrivateMsg(userId: userId, text: replyMsg)
+                        return
+                    } else {
+                        try? await qqClient.sendPrivateMsg(userId: userId, text: "当前暂无待审核的好友申请或权限申请喵~")
+                        return
+                    }
                 }
             }
 
@@ -813,36 +1045,79 @@ public final class QQController: ObservableObject {
                 if targetId == nil, let q = quotedText {
                     targetId = extractQQNumber(from: q)
                 }
-                if targetId == nil {
-                    if pendingRequests.count == 1 {
-                        targetId = pendingRequests.first?.userId
-                    } else if pendingRequests.count > 1 {
-                        targetId = pendingRequests.last?.userId
-                    } else {
-                        try? await qqClient.sendPrivateMsg(userId: userId, text: "当前暂无待审核的权限申请喵~")
-                        return
-                    }
-                }
 
-                if let tid = targetId {
-                    let res = await rejectRequest(userId: tid)
+                // 1. 优先匹配待处理好友申请
+                if let tid = targetId, pendingFriendRequests.contains(where: { $0.userId == tid }) {
+                    let res = await rejectFriendRequest(userId: tid)
                     var replyMsg = res.message
-                    if pendingRequests.count > 0 {
-                        replyMsg += "\n💡 当前仍有 \(pendingRequests.count) 条待审核申请，可回复 /pending 查看列表。"
+                    let remaining = pendingFriendRequests.count + pendingRequests.count
+                    if remaining > 0 {
+                        replyMsg += "\n💡 当前仍有 \(remaining) 条待审批事项，可回复 /pending 查看列表。"
                     }
                     try? await qqClient.sendPrivateMsg(userId: userId, text: replyMsg)
                     return
                 }
+
+                // 2. 匹配待处理 AI 聊天权限申请
+                if let tid = targetId, pendingRequests.contains(where: { $0.userId == tid }) {
+                    let res = await rejectRequest(userId: tid)
+                    var replyMsg = res.message
+                    let remaining = pendingFriendRequests.count + pendingRequests.count
+                    if remaining > 0 {
+                        replyMsg += "\n💡 当前仍有 \(remaining) 条待审批事项，可回复 /pending 查看列表。"
+                    }
+                    try? await qqClient.sendPrivateMsg(userId: userId, text: replyMsg)
+                    return
+                }
+
+                // 3. 未明确指定 QQ 号时的智能队列判定
+                if targetId == nil {
+                    if (isFriendApproval || pendingRequests.isEmpty) && !pendingFriendRequests.isEmpty {
+                        let tid = pendingFriendRequests.last!.userId
+                        let res = await rejectFriendRequest(userId: tid)
+                        var replyMsg = res.message
+                        let remaining = pendingFriendRequests.count + pendingRequests.count
+                        if remaining > 0 {
+                            replyMsg += "\n💡 当前仍有 \(remaining) 条待审批事项，可回复 /pending 查看列表。"
+                        }
+                        try? await qqClient.sendPrivateMsg(userId: userId, text: replyMsg)
+                        return
+                    } else if !pendingRequests.isEmpty {
+                        let tid = pendingRequests.last!.userId
+                        let res = await rejectRequest(userId: tid)
+                        var replyMsg = res.message
+                        let remaining = pendingFriendRequests.count + pendingRequests.count
+                        if remaining > 0 {
+                            replyMsg += "\n💡 当前仍有 \(remaining) 条待审批事项，可回复 /pending 查看列表。"
+                        }
+                        try? await qqClient.sendPrivateMsg(userId: userId, text: replyMsg)
+                        return
+                    } else {
+                        try? await qqClient.sendPrivateMsg(userId: userId, text: "当前暂无待审核的好友申请或权限申请喵~")
+                        return
+                    }
+                }
             }
 
             if lower == "/pending" || lower == "待审核" || lower == "申请列表" {
-                if pendingRequests.isEmpty {
-                    try? await qqClient.sendPrivateMsg(userId: userId, text: "当前暂无待审核的权限申请喵~")
+                if pendingFriendRequests.isEmpty && pendingRequests.isEmpty {
+                    try? await qqClient.sendPrivateMsg(userId: userId, text: "当前暂无待审核的好友申请或权限申请喵~")
                 } else {
-                    let listStr = pendingRequests.enumerated().map { (idx, req) in
-                        "\(idx + 1). \(req.senderName) (\(req.userId))" + (req.note.isEmpty ? "" : " - 附言: \(req.note)")
-                    }.joined(separator: "\n")
-                    try? await qqClient.sendPrivateMsg(userId: userId, text: "📋 当前待审核申请：\n\(listStr)\n\n👉 极简审批：直接回复【同意】或【拒绝】\n👉 精准审批：回复【同意 <QQ>】或【拒绝 <QQ>】")
+                    var sections: [String] = []
+                    if !pendingFriendRequests.isEmpty {
+                        let listStr = pendingFriendRequests.enumerated().map { (idx, req) in
+                            "\(idx + 1). 申请人 QQ: \(req.userId)" + (req.comment.isEmpty ? "" : " (附言: \(req.comment))")
+                        }.joined(separator: "\n")
+                        sections.append("👥【待处理好友申请 (\(pendingFriendRequests.count) 条)】\n\(listStr)")
+                    }
+                    if !pendingRequests.isEmpty {
+                        let listStr = pendingRequests.enumerated().map { (idx, req) in
+                            "\(idx + 1). \(req.senderName) (\(req.userId))" + (req.note.isEmpty ? "" : " (附言: \(req.note))")
+                        }.joined(separator: "\n")
+                        sections.append("💬【待审核 AI 聊天权限 (\(pendingRequests.count) 条)】\n\(listStr)")
+                    }
+                    sections.append("👉 极简审批：直接回复【同意】或【拒绝】\n👉 精确审批：回复【同意 <QQ>】或【拒绝 <QQ>】")
+                    try? await qqClient.sendPrivateMsg(userId: userId, text: sections.joined(separator: "\n\n"))
                 }
                 return
             }
@@ -864,7 +1139,7 @@ public final class QQController: ObservableObject {
             let deniedText = """
             ⛔️ 您好喵~ 目前您尚未获得萌萌的 AI 聊天权限。
 
-            💡 申请权限：您可以直接向萌萌发送 /ai 提交申请，待主人（真实管理员）审核通过后即可为您开启沙箱对话喵~
+            💡 申请权限：您可以直接向萌萌发送 /ai 提交申请，待系统所有者审核通过后即可为您开启沙箱对话喵~
             """
             try? await qqClient.sendPrivateMsg(userId: userId, text: deniedText)
             return
@@ -901,8 +1176,8 @@ public final class QQController: ObservableObject {
 
         if text == "/status" || text == "状态" {
             guard isMaster else {
-                logger.warn("QQ", "普通白名单用户 [\(senderName)](\(userId)) 尝试查询宿主状态，已拦截（仅限真实管理员）")
-                try? await qqClient.sendPrivateMsg(userId: userId, text: "⛔️ 权限受限：Mac mini 宿主系统运行状态仅限真实管理员（设备主人）查看。您当前处于白名单沙箱安全模式。")
+                logger.warn("QQ", "普通白名单用户 [\(senderName)](\(userId)) 尝试查询宿主状态，已拦截（仅限系统所有者）")
+                try? await qqClient.sendPrivateMsg(userId: userId, text: "⛔️ 权限受限：Mac mini 宿主系统运行状态仅限系统所有者（Owner）查看。您当前处于白名单沙箱安全模式。")
                 return
             }
             let status = await agyService.getMacSystemStatus()
@@ -914,8 +1189,8 @@ public final class QQController: ObservableObject {
 
         if text == "/quota" || text == "/limit" || text == "额度" {
             guard isMaster else {
-                logger.warn("QQ", "普通白名单用户 [\(senderName)](\(userId)) 尝试查询反重力额度，已拦截（仅限真实管理员）")
-                try? await qqClient.sendPrivateMsg(userId: userId, text: "⛔️ 权限受限：反重力 AI 额度仅限真实管理员查看。")
+                logger.warn("QQ", "普通白名单用户 [\(senderName)](\(userId)) 尝试查询反重力额度，已拦截（仅限系统所有者）")
+                try? await qqClient.sendPrivateMsg(userId: userId, text: "⛔️ 权限受限：反重力 AI 额度仅限系统所有者（Owner）查看。")
                 return
             }
             let quota = await agyService.getAgyQuotaReport()

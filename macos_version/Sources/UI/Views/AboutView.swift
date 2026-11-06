@@ -15,6 +15,8 @@ public struct AboutView: View {
 
                 appInfoCard
 
+                authorCard
+
                 storagePathsCard
 
                 architectureCard
@@ -32,7 +34,7 @@ public struct AboutView: View {
                     Image(systemName: "info.circle.fill")
                         .font(.system(size: 22))
                         .foregroundColor(.blue)
-                    Text("关于与系统信息")
+                    Text("关于与说明")
                         .font(.system(size: 22, weight: .bold))
                 }
 
@@ -52,7 +54,7 @@ public struct AboutView: View {
                 .cornerRadius(8)
             }
 
-            Text("查看 TGBot Hub 系统信息、本地存储目录及核心技术架构。")
+            Text("查看 TGBot Hub 作者信息、系统环境、本地存储目录及核心技术架构。")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
         }
@@ -122,6 +124,104 @@ public struct AboutView: View {
         )
     }
 
+    // MARK: - 作者与开源信息卡片
+    private var authorCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("作者与开源生态", systemImage: "person.crop.circle.fill")
+                .font(.system(size: 15, weight: .bold))
+
+            HStack(alignment: .center, spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.85), Color.blue.opacity(0.85)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 48, height: 48)
+
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text("MrcolorH")
+                            .font(.system(size: 15, weight: .bold))
+
+                        Text("作者 / 开发者")
+                            .font(.system(size: 11, weight: .medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.12))
+                            .foregroundColor(.purple)
+                            .cornerRadius(4)
+                    }
+
+                    Text("GitHub: @MrcolorH · 高性能自动化与多端跨平台研发")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                    Button(action: {
+                        if let url = URL(string: "https://github.com/MrcolorH") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.crop.circle")
+                            Text("作者主页")
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    Button(action: {
+                        if let url = URL(string: "https://github.com/MrcolorH/TGBot") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                            Text("GitHub 仓库")
+                        }
+                        .font(.system(size: 11))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+            }
+            .padding(14)
+            .background(Color(NSColor.textBackgroundColor).opacity(0.4))
+            .cornerRadius(10)
+
+            HStack(spacing: 16) {
+                Label("开源协议: MIT License", systemImage: "doc.text.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                Label("仓库地址: github.com/MrcolorH/TGBot", systemImage: "link")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 4)
+        }
+        .padding(18)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 1)
+        )
+    }
+
     // MARK: - 本地数据与目录卡片
     private var storagePathsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -131,7 +231,7 @@ public struct AboutView: View {
             VStack(alignment: .leading, spacing: 10) {
                 PathRow(
                     label: "主配置文件",
-                    desc: "持久化存储 Token、白名单、QQ 凭据与角色卡库",
+                    desc: "持久化存储 Token、白名单、QQ 账号凭据与角色卡库",
                     path: "~/.tgbot/config.json"
                 )
 
@@ -139,7 +239,7 @@ public struct AboutView: View {
 
                 PathRow(
                     label: "隔离沙箱工作区",
-                    desc: "非宿主管理员的普通访客执行 CLI 时的隔离物理沙盒目录",
+                    desc: "非系统所有者的白名单访客执行 CLI 时的隔离物理沙箱目录",
                     path: "~/.tgbot/sandbox"
                 )
 

@@ -189,6 +189,8 @@ public final class BotController: ObservableObject {
 
         pollingTask = Task.detached(priority: .userInitiated) { [weak self] in
             var offset = 0
+            var hasPollingError = false
+            var consecutiveErrorCount = 0
 
             while !Task.isCancelled {
                 guard let self = self else { break }
@@ -198,6 +200,14 @@ public final class BotController: ObservableObject {
 
                 do {
                     let updates = try await client.getUpdates(offset: offset, timeout: 20)
+
+                    // 如果此前出现过轮询报错或网络波动，本次恢复正常后打印一条成功日志
+                    if hasPollingError {
+                        hasPollingError = false
+                        consecutiveErrorCount = 0
+                        let log = await self.logger
+                        log.success("Bot", "✅ 网络连接与消息轮询已恢复正常，正在持续监听中...")
+                    }
 
                     for update in updates {
                         if Task.isCancelled { break }
@@ -223,31 +233,55 @@ public final class BotController: ObservableObject {
                     }
                 } catch let tgError as TelegramError {
                     if Task.isCancelled { break }
+                    hasPollingError = true
+                    consecutiveErrorCount += 1
                     let log = await self.logger
+                    // 避免连续波动每 2 秒大量重复打印：首次立即打印，若持续出错则每 10 次（约 20-30 秒）打印一次
+                    let shouldLog = (consecutiveErrorCount == 1) || (consecutiveErrorCount % 10 == 0)
 
                     switch tgError {
                     case .apiError(let code, let desc):
                         if code == 409 {
-                            log.warn(
-                                "Bot",
-                                "⚠️ 409 冲突：检测到此 Token 正在其他设备或后台进程中运行。同一时刻只能有一个实例轮询！[5秒后重试]"
-                            )
+                            if shouldLog {
+                                log.warn(
+                                    "Bot",
+                                    "⚠️ 409 冲突：检测到此 Token 正在其他设备或后台进程中运行。同一时刻只能有一个实例轮询！[5秒后重试\(consecutiveErrorCount > 1 ? "，连续第\(consecutiveErrorCount)次" : "")]"
+                                )
+                            }
                             try? await Task.sleep(nanoseconds: 5_000_000_000)
                         } else {
-                            log.warn("Bot", "Telegram API 响应异常 (\(code): \(desc)) [3秒后重试]")
+                            if shouldLog {
+                                log.warn("Bot", "Telegram API 响应异常 (\(code): \(desc)) [3秒后重试\(consecutiveErrorCount > 1 ? "，连续第\(consecutiveErrorCount)次" : "")]")
+                            }
                             try? await Task.sleep(nanoseconds: 3_000_000_000)
                         }
                     default:
-                        log.warn("Bot", "网络轮询波动: \(tgError.localizedDescription) [2秒后重试]")
+                        if shouldLog {
+                            log.warn("Bot", "网络轮询波动: \(tgError.localizedDescription) [2秒后重试\(consecutiveErrorCount > 1 ? "，连续第\(consecutiveErrorCount)次" : "")]")
+                        }
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                     }
                 } catch {
                     if Task.isCancelled { break }
-                    let log = await self.logger
-                    log.warn("Bot", "轮询发生错误: \(error.localizedDescription) [2秒后重试]")
+                    hasPollingError = true
+                    consecutiveErrorCount += 1
+                    let shouldLog = (consecutiveErrorCount == 1) || (consecutiveErrorCount % 10 == 0)
+
+                    if shouldLog {
+                        let log = await self.logger
+                        log.warn("Bot", "轮询发生错误: \(error.localizedDescription) [2秒后重试\(consecutiveErrorCount > 1 ? "，连续第\(consecutiveErrorCount)次" : "")]")
+                    }
                     try? await Task.sleep(nanoseconds: 2_000_000_000)
                 }
             }
+        }
+    }
+
+    /// 向 Telegram 系统所有者派发广播通知
+    public func sendNotificationToMasterAdmins(text: String) async {
+        guard let client = client, isRunning else { return }
+        for adminId in storage.masterAdminList {
+            _ = try? await client.sendMessage(chatId: adminId, text: text)
         }
     }
 }

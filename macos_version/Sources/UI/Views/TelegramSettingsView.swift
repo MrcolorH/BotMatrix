@@ -73,7 +73,7 @@ public struct TelegramSettingsView: View {
                 .animation(.easeInOut, value: showSavedToast)
             }
 
-            Text("配置 Telegram 机器人凭据、宿主真机管理员、沙箱白名单访问控制及消息防窥折叠。")
+            Text("配置 Telegram 机器人凭据、系统所有者、沙箱白名单访问控制及消息防窥折叠。")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
         }
@@ -146,39 +146,39 @@ public struct TelegramSettingsView: View {
     private var multiAdminSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Label("Telegram 权限分级管理 (真实管理员 vs 沙箱白名单)", systemImage: "person.2.badge.gearshape.fill")
+                Label("Telegram 权限分级管理 (系统所有者 vs 沙箱白名单)", systemImage: "person.2.badge.gearshape.fill")
                     .font(.system(size: 15, weight: .bold))
 
                 Spacer()
             }
 
-            // 1. 👑 TG 真实管理员 (拥有真机完全读写权限)
+            // 1. 👑 TG 系统所有者 (拥有真机完全读写权限)
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label("👑 真实管理员 (拥有 Mac 宿主真机读写与维护权限)", systemImage: "crown.fill")
+                    Label("系统所有者 (拥有 Mac 宿主真机完全读写与维护权限)", systemImage: "crown.fill")
                         .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.orange)
+                        .foregroundColor(.indigo)
 
                     Spacer()
 
-                    Text("\(storage.masterAdminList.count) 位真实管理")
+                    Text("\(storage.masterAdminList.count) 位系统所有者")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.orange)
+                        .foregroundColor(.indigo)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.orange.opacity(0.15))
+                        .background(Color.indigo.opacity(0.1))
                         .cornerRadius(4)
                 }
 
-                Text("真实管理员专享：具备 Mac mini 本地读写与终端命令能力，独享 /status 宿主系统运行状态与 /quota 额度查询。")
+                Text("系统所有者专享：具备 Mac mini 本地读写与终端命令能力，独享 /status 宿主系统运行状态与 /quota 额度查询。")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
 
                 HStack(spacing: 8) {
-                    TextField("输入 Telegram 真实管理员 ID (例如: 6663213026)", text: $newMasterAdminIdText)
+                    TextField("输入系统所有者 Telegram ID (Owner ID，例如: 123456789)", text: $newMasterAdminIdText)
                         .textFieldStyle(.roundedBorder)
 
-                    Button("添加真机管理") {
+                    Button("添加系统所有者") {
                         let cleaned = newMasterAdminIdText.trimmingCharacters(in: .whitespacesAndNewlines)
                         if let uid = Int64(cleaned) {
                             storage.addMasterAdmin(id: uid)
@@ -187,21 +187,21 @@ public struct TelegramSettingsView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.orange)
+                    .tint(.indigo)
                     .disabled(newMasterAdminIdText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
 
                 if storage.masterAdminList.isEmpty {
-                    Text("⚠️ 暂未指定真实管理员。建议填入您的 Telegram User ID，以解锁宿主真机读写与运维指令。")
+                    Text("尚未指定系统所有者。建议填入您的 Telegram User ID，以解锁宿主真机最高权限与运维指令。")
                         .font(.system(size: 11))
-                        .foregroundColor(.orange)
+                        .foregroundColor(.secondary)
                 } else {
                     FlowLayout(spacing: 6) {
                         ForEach(storage.masterAdminList, id: \.self) { adminId in
                             HStack(spacing: 5) {
                                 Image(systemName: "crown.fill")
                                     .font(.system(size: 10))
-                                    .foregroundColor(.orange)
+                                    .foregroundColor(.indigo)
                                 Text("\(adminId)")
                                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
 
@@ -217,19 +217,23 @@ public struct TelegramSettingsView: View {
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.orange.opacity(0.12))
+                            .background(Color.indigo.opacity(0.1))
                             .cornerRadius(6)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                                    .stroke(Color.indigo.opacity(0.25), lineWidth: 1)
                             )
                         }
                     }
                 }
             }
             .padding(12)
-            .background(Color.orange.opacity(0.04))
+            .background(Color(NSColor.textBackgroundColor).opacity(0.45))
             .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.indigo.opacity(0.18), lineWidth: 1)
+            )
 
             // 2. 🛡️ TG 普通白名单 (沙箱安全隔离模式)
             VStack(alignment: .leading, spacing: 8) {
@@ -294,7 +298,7 @@ public struct TelegramSettingsView: View {
                 }
 
                 HStack(spacing: 8) {
-                    TextField("输入 Telegram 纯数字 ID，例如: 6663213026", text: $newAdminIdText)
+                    TextField("输入 Telegram 纯数字 ID，例如: 123456789", text: $newAdminIdText)
                         .textFieldStyle(.roundedBorder)
 
                     Button("➕ 添加白名单") {

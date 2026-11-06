@@ -6,7 +6,7 @@ public struct QQSettingsView: View {
     @ObservedObject var storage: StorageService
     @ObservedObject var qqController: QQController
 
-    // 🐧 QQ 小号接入状态
+    // 🐧 QQ 账号接入状态
     @State private var inputQQWsUrl: String = ""
     @State private var inputQQMasterAdminId: String = ""
     @State private var inputQQAdminId: String = ""
@@ -18,6 +18,9 @@ public struct QQSettingsView: View {
     @State private var qqTestSuccess: Bool = false
     @State private var restoreQQResult: String? = nil
     @State private var isRestoringQQ: Bool = false
+    @State private var isAddingMaster: Bool = false
+    @State private var isAddingAdmin: Bool = false
+    @State private var refreshingUserIds: Set<Int64> = []
 
     // 保存提示
     @State private var showSavedToast: Bool = false
@@ -49,6 +52,9 @@ public struct QQSettingsView: View {
             inputQQWsUrl = storage.qqWsUrl
             inputQQAccount = storage.qqAccount
             inputQQPassword = storage.qqPassword
+            Task {
+                await qqController.refreshAllQQProfiles()
+            }
         }
         .sheet(isPresented: $showSettingsLoginSheet) {
             QQLoginSheet()
@@ -91,7 +97,7 @@ public struct QQSettingsView: View {
                 }
             }
 
-            Text("通过本地 OneBot v11 (NapCat / LLOneBot) 挂接个人 QQ 小号，支持独立权限隔离、会话记忆隔离与群聊/私聊交互。")
+            Text("通过本地 OneBot v11 (NapCat / LLOneBot) 接入 QQ 账号，支持独立权限隔离、会话记忆隔离与群聊/私聊交互。")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
         }
@@ -114,7 +120,7 @@ public struct QQSettingsView: View {
             HStack(spacing: 12) {
                 HStack(spacing: 6) {
                     Image(systemName: storage.isMacQQInstalled ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                        .foregroundColor(storage.isMacQQInstalled ? .green : .orange)
+                        .foregroundColor(storage.isMacQQInstalled ? .green : .secondary)
                     Text("官方 Mac QQ: \(storage.isMacQQInstalled ? "已安装" : "未安装")")
                         .font(.system(size: 11))
                 }
@@ -129,7 +135,7 @@ public struct QQSettingsView: View {
 
                 HStack(spacing: 6) {
                     Image(systemName: storage.isNapCatInstalled ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                        .foregroundColor(storage.isNapCatInstalled ? .green : .orange)
+                        .foregroundColor(storage.isNapCatInstalled ? .green : .secondary)
                     Text("NapCat 协议端: \(storage.isNapCatInstalled ? "已就绪" : "未配置")")
                         .font(.system(size: 11))
                 }
@@ -260,7 +266,7 @@ public struct QQSettingsView: View {
     private var credentialsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Label("QQ 小号凭据与静默免密登录", systemImage: "person.badge.key.fill")
+                Label("QQ 账号凭据与免密登录", systemImage: "person.badge.key.fill")
                     .font(.system(size: 15, weight: .bold))
 
                 Spacer()
@@ -282,7 +288,7 @@ public struct QQSettingsView: View {
                     Text("默认 QQ 号:")
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
-                    TextField("如: 3178629006", text: $inputQQAccount)
+                    TextField("如: 10001", text: $inputQQAccount)
                         .textFieldStyle(.roundedBorder)
                 }
 
@@ -321,229 +327,44 @@ public struct QQSettingsView: View {
 
     // MARK: - 权限分级隔离卡片
     private var permissionsSection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("QQ 权限分级隔离配置 (真实管理员 vs 沙箱白名单)", systemImage: "person.2.badge.gearshape.fill")
-                .font(.system(size: 15, weight: .bold))
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label("QQ 权限分级隔离配置 (系统所有者 vs 沙箱白名单)", systemImage: "person.2.badge.gearshape.fill")
+                    .font(.system(size: 15, weight: .bold))
 
-            // 1. 👑 真实管理员
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label("👑 QQ 真实管理员 (账号所有人 - 真机完全控制权)", systemImage: "crown.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.orange)
+                Spacer()
 
-                    Spacer()
-
-                    Text("已设 \(storage.qqMasterAdminList.count) 位宿主管理")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.orange.opacity(0.15))
-                        .cornerRadius(4)
-                }
-
-                Text("真实管理员专享：具备 Mac mini 宿主设备文件的完整读写与终端命令执行权限，并可执行 /status 系统报告与额度监控。")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-
-                HStack(spacing: 8) {
-                    TextField("输入账号所有人的 QQ 号 (如: 1419046431)", text: $inputQQMasterAdminId)
-                        .textFieldStyle(.roundedBorder)
-
-                    Button("添加真机管理员") {
-                        let cleaned = inputQQMasterAdminId.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if let uid = Int64(cleaned) {
-                            storage.addQQMasterAdmin(id: uid)
-                            inputQQMasterAdminId = ""
-                            triggerToast()
+                if qqController.isConnected {
+                    Button(action: {
+                        Task {
+                            await qqController.refreshAllQQProfiles()
                         }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
-                    .disabled(inputQQMasterAdminId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-
-                if storage.qqMasterAdminList.isEmpty {
-                    Text("⚠️ 尚未设置真实管理员。建议在此填入您自己的 QQ 号，以激活真机读写与维护权限。")
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                            Text("刷新所有资料")
+                        }
                         .font(.system(size: 11))
-                        .foregroundColor(.orange)
-                } else {
-                    FlowLayout(spacing: 6) {
-                        ForEach(storage.qqMasterAdminList, id: \.self) { adminId in
-                            HStack(spacing: 5) {
-                                Image(systemName: "crown.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.orange)
-                                Text("\(adminId)")
-                                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
-
-                                Button(action: {
-                                    storage.removeQQMasterAdmin(id: adminId)
-                                    triggerToast()
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.orange.opacity(0.12))
-                            .cornerRadius(6)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-                            )
-                        }
                     }
+                    .buttonStyle(.borderless)
+                    .foregroundColor(.secondary)
                 }
             }
-            .padding(12)
-            .background(Color.orange.opacity(0.04))
-            .cornerRadius(8)
 
-            // 2. 🛡️ QQ 普通白名单
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Label("🛡️ QQ 普通白名单 (沙箱安全隔离模式)", systemImage: "shield.checkered")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.blue)
+            // 1. 👑 系统所有者 (唯一宿主 - 主人仅限一位)
+            masterAdminSubSection
 
-                    Spacer()
+            // 2. 🛡️ QQ 普通白名单 (沙箱安全隔离模式)
+            sandboxAdminSubSection
 
-                    Text("已授权 \(storage.qqAdminList.count) 位沙箱访客")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.blue)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.blue.opacity(0.12))
-                        .cornerRadius(4)
-                }
-
-                Text("普通白名单用户可在 QQ 正常与 AI 拟人化自然对话，但工作区被硬隔离在独立沙箱中（~/.tgbot/sandbox/），严禁读取或修改 Mac 本机任何内容，严禁执行敏感主机维护指令。")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-
-                HStack(spacing: 8) {
-                    TextField("输入被授权的好友或群成员 QQ 号", text: $inputQQAdminId)
-                        .textFieldStyle(.roundedBorder)
-
-                    Button("添加沙箱白名单") {
-                        let cleaned = inputQQAdminId.trimmingCharacters(in: .whitespacesAndNewlines)
-                        if let uid = Int64(cleaned) {
-                            storage.addQQAdmin(id: uid)
-                            inputQQAdminId = ""
-                            triggerToast()
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(inputQQAdminId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-
-                if storage.qqAdminList.isEmpty {
-                    Text("⚠️ 暂未添加沙箱白名单。非名单用户发送消息将被完全拦截，保护 Mac 算力。")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                } else {
-                    FlowLayout(spacing: 6) {
-                        ForEach(storage.qqAdminList, id: \.self) { adminId in
-                            HStack(spacing: 5) {
-                                Image(systemName: "person.badge.shield.checkmark.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.cyan)
-                                Text("\(adminId)")
-                                    .font(.system(size: 12, design: .monospaced))
-
-                                Button(action: {
-                                    storage.removeQQAdmin(id: adminId)
-                                    triggerToast()
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.cyan.opacity(0.12))
-                            .cornerRadius(6)
-                        }
-                    }
-                }
+            // 3. 👥 新的好友添加申请待审批
+            if !qqController.pendingFriendRequests.isEmpty {
+                pendingFriendRequestsSubSection
             }
-            .padding(12)
-            .background(Color.blue.opacity(0.04))
-            .cornerRadius(8)
 
-            // 3. 📬 好友权限申请待审批列表
+            // 4. 📬 好友 AI 聊天申请待审批列表
             if !qqController.pendingRequests.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Label("📬 好友 AI 聊天申请待审核 (\(qqController.pendingRequests.count) 条)", systemImage: "tray.full.fill")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.purple)
-
-                        Spacer()
-
-                        Text("可在此点击通过或在 QQ 私聊回复 /approve")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                    }
-
-                    ForEach(qqController.pendingRequests) { req in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: 6) {
-                                    Text(req.senderName)
-                                        .font(.system(size: 12, weight: .semibold))
-                                    Text("(\(req.userId))")
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                }
-                                if !req.note.isEmpty {
-                                    Text("申请附言: \(req.note)")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-
-                            Spacer()
-
-                            Button("批准加入沙箱") {
-                                Task {
-                                    _ = await qqController.approveRequest(userId: req.userId)
-                                    triggerToast()
-                                }
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.green)
-                            .controlSize(.small)
-
-                            Button("拒绝") {
-                                Task {
-                                    _ = await qqController.rejectRequest(userId: req.userId)
-                                    triggerToast()
-                                }
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.red)
-                            .controlSize(.small)
-                        }
-                        .padding(8)
-                        .background(Color(NSColor.textBackgroundColor))
-                        .cornerRadius(6)
-                    }
-                }
-                .padding(12)
-                .background(Color.purple.opacity(0.06))
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.purple.opacity(0.2), lineWidth: 1)
-                )
+                pendingChatRequestsSubSection
             }
         }
         .padding(18)
@@ -553,6 +374,358 @@ public struct QQSettingsView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 1)
         )
+    }
+
+    // MARK: - 1. 系统所有者 (唯一宿主)
+    private var masterAdminSubSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("系统所有者 (唯一宿主 - 真机最高控制权)", systemImage: "crown.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.indigo)
+
+                Spacer()
+
+                Text(storage.qqMasterAdminList.isEmpty ? "未设所有者" : "已设 1 位系统所有者 (唯一主人)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.indigo)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.indigo.opacity(0.1))
+                    .cornerRadius(4)
+            }
+
+            Text("系统所有者专享：具备 Mac mini 宿主设备文件的完整读写与终端命令执行权限，并可执行 /status 系统报告与额度监控。")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            if let masterId = storage.qqMasterAdminList.first {
+                // 已有主人：卡片化展示，并锁定添加（主人仅限1位，只能删除）
+                QQUserCard(
+                    userId: masterId,
+                    isMaster: true,
+                    nickname: storage.getQQNickname(userId: masterId),
+                    isRefreshing: refreshingUserIds.contains(masterId),
+                    onRefresh: {
+                        refreshUserProfile(userId: masterId)
+                    },
+                    onDelete: {
+                        storage.removeQQMasterAdmin(id: masterId)
+                        triggerToast()
+                    }
+                )
+
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text("系统所有者（主人）仅限 1 位以确保宿主安全。如需更换，请先点击上方「移除」解除绑定后再添加。")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 2)
+            } else {
+                // 尚未设置主人：提供输入框与自动查询添加
+                HStack(spacing: 8) {
+                    TextField("输入系统所有者的 QQ 号 (Owner QQ，如: 10001)", text: $inputQQMasterAdminId)
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(isAddingMaster)
+
+                    Button(action: {
+                        addMasterAdminAction()
+                    }) {
+                        if isAddingMaster {
+                            HStack(spacing: 5) {
+                                ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                                Text("查询添加中...")
+                            }
+                        } else {
+                            Text("添加系统所有者")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.indigo)
+                    .disabled(inputQQMasterAdminId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAddingMaster)
+                }
+
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text("尚未设置系统所有者。建议填入您的 QQ 号，以激活 Mac mini 宿主控制与维护权限。")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(NSColor.textBackgroundColor).opacity(0.45))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.indigo.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - 2. QQ 普通白名单 (沙箱模式)
+    private var sandboxAdminSubSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("QQ 普通白名单 (沙箱安全隔离模式)", systemImage: "shield.checkered")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.blue)
+
+                Spacer()
+
+                Text("已授权 \(storage.qqAdminList.count) 位沙箱访客")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.blue)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(4)
+            }
+
+            Text("普通白名单用户可在 QQ 正常与 AI 拟人化自然对话，但工作区被硬隔离在独立沙箱中（~/.tgbot/sandbox/），严禁读取或修改 Mac 本机任何内容，严禁执行敏感主机维护指令。")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 8) {
+                TextField("输入被授权的好友或群成员 QQ 号", text: $inputQQAdminId)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(isAddingAdmin)
+
+                Button(action: {
+                    addSandboxAdminAction()
+                }) {
+                    if isAddingAdmin {
+                        HStack(spacing: 5) {
+                            ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                            Text("查询添加中...")
+                        }
+                    } else {
+                        Text("添加沙箱白名单")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(inputQQAdminId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isAddingAdmin)
+            }
+
+            if storage.qqAdminList.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text("暂未添加沙箱白名单。非名单用户发送消息将被完全拦截，保护 Mac 算力。")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(storage.qqAdminList, id: \.self) { adminId in
+                        QQUserCard(
+                            userId: adminId,
+                            isMaster: false,
+                            nickname: storage.getQQNickname(userId: adminId),
+                            isRefreshing: refreshingUserIds.contains(adminId),
+                            onRefresh: {
+                                refreshUserProfile(userId: adminId)
+                            },
+                            onDelete: {
+                                storage.removeQQAdmin(id: adminId)
+                                triggerToast()
+                            }
+                        )
+                    }
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(14)
+        .background(Color(NSColor.textBackgroundColor).opacity(0.45))
+        .cornerRadius(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.blue.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    // MARK: - 3. 好友添加待审批
+    private var pendingFriendRequestsSubSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("👥 好友添加申请待审批 (\(qqController.pendingFriendRequests.count) 条)", systemImage: "person.crop.circle.badge.plus")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.blue)
+
+                Spacer()
+
+                Text("可在此直接同意/拒绝，或在 QQ 私聊回复【同意】/【拒绝】")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+
+            ForEach(qqController.pendingFriendRequests) { req in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("申请人 QQ:")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                            Text("\(req.userId)")
+                                .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        }
+                        if !req.comment.isEmpty {
+                            Text("申请附言: \(req.comment)")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button("同意添加好友") {
+                        Task {
+                            _ = await qqController.approveFriendRequest(userId: req.userId)
+                            triggerToast()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .controlSize(.small)
+
+                    Button("拒绝") {
+                        Task {
+                            _ = await qqController.rejectFriendRequest(userId: req.userId)
+                            triggerToast()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .controlSize(.small)
+                }
+                .padding(8)
+                .background(Color(NSColor.textBackgroundColor))
+                .cornerRadius(6)
+            }
+        }
+        .padding(12)
+        .background(Color.blue.opacity(0.06))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.blue.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    // MARK: - 4. 聊天申请待审批
+    private var pendingChatRequestsSubSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("📬 好友 AI 聊天申请待审核 (\(qqController.pendingRequests.count) 条)", systemImage: "tray.full.fill")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.purple)
+
+                Spacer()
+
+                Text("可在此点击通过或在 QQ 私聊回复 /approve")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+            }
+
+            ForEach(qqController.pendingRequests) { req in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(req.senderName)
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("(\(req.userId))")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                        if !req.note.isEmpty {
+                            Text("申请附言: \(req.note)")
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    Button("批准加入沙箱") {
+                        Task {
+                            _ = await qqController.approveRequest(userId: req.userId)
+                            triggerToast()
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .controlSize(.small)
+
+                    Button("拒绝") {
+                        Task {
+                            _ = await qqController.rejectRequest(userId: req.userId)
+                            triggerToast()
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .controlSize(.small)
+                }
+                .padding(8)
+                .background(Color(NSColor.textBackgroundColor))
+                .cornerRadius(6)
+            }
+        }
+        .padding(12)
+        .background(Color.purple.opacity(0.06))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    // MARK: - 成员操作与资料查询逻辑
+    private func addMasterAdminAction() {
+        let cleaned = inputQQMasterAdminId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let uid = Int64(cleaned) else { return }
+        isAddingMaster = true
+        Task {
+            _ = await qqController.fetchAndCacheQQUserInfo(userId: uid)
+            await MainActor.run {
+                storage.addQQMasterAdmin(id: uid)
+                self.inputQQMasterAdminId = ""
+                self.isAddingMaster = false
+                self.triggerToast()
+            }
+        }
+    }
+
+    private func addSandboxAdminAction() {
+        let cleaned = inputQQAdminId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let uid = Int64(cleaned) else { return }
+        isAddingAdmin = true
+        Task {
+            _ = await qqController.fetchAndCacheQQUserInfo(userId: uid)
+            await MainActor.run {
+                storage.addQQAdmin(id: uid)
+                self.inputQQAdminId = ""
+                self.isAddingAdmin = false
+                self.triggerToast()
+            }
+        }
+    }
+
+    private func refreshUserProfile(userId: Int64) {
+        refreshingUserIds.insert(userId)
+        Task {
+            _ = await qqController.fetchAndCacheQQUserInfo(userId: userId)
+            await MainActor.run {
+                refreshingUserIds.remove(userId)
+                triggerToast()
+            }
+        }
     }
 
     // MARK: - 多租户会话隔离与记忆配置
@@ -667,5 +840,145 @@ public struct QQSettingsView: View {
         }
 
         conn.start(queue: DispatchQueue.global())
+    }
+}
+
+// MARK: - QQ 用户卡片组件 (列表-卡片展示：昵称、头像小图、QQ号)
+struct QQUserCard: View {
+    let userId: Int64
+    let isMaster: Bool
+    let nickname: String?
+    let isRefreshing: Bool
+    let onRefresh: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // 1. 头像小图 (38x38 官方 CDN 实时加载，圆角矩形，平滑占位)
+            AsyncImage(url: URL(string: "https://q1.qlogo.cn/g?b=qq&nk=\(userId)&s=100")) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 38, height: 38)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                case .failure(_):
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(NSColor.controlBackgroundColor))
+                        Image(systemName: isMaster ? "crown.fill" : "person.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(width: 38, height: 38)
+                case .empty:
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(NSColor.controlBackgroundColor))
+                        ProgressView().scaleEffect(0.6)
+                    }
+                    .frame(width: 38, height: 38)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color(NSColor.separatorColor).opacity(0.35), lineWidth: 1)
+            )
+
+            // 2. 昵称与 QQ 账号
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(nickname?.isEmpty == false ? nickname! : "QQ 用户")
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+
+                    if isMaster {
+                        HStack(spacing: 3) {
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 8))
+                            Text("系统宿主")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.indigo.opacity(0.12))
+                        .foregroundColor(.indigo)
+                        .cornerRadius(4)
+                    } else {
+                        HStack(spacing: 3) {
+                            Image(systemName: "shield.fill")
+                                .font(.system(size: 8))
+                            Text("沙箱隔离")
+                                .font(.system(size: 9, weight: .semibold))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .cornerRadius(4)
+                    }
+                }
+
+                HStack(spacing: 4) {
+                    Text("QQ:")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                    Text("\(userId)")
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(.secondary)
+
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString("\(userId)", forType: .string)
+                    }) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 9))
+                            .foregroundColor(.secondary.opacity(0.8))
+                    }
+                    .buttonStyle(.plain)
+                    .help("复制 QQ 号")
+                }
+            }
+
+            Spacer()
+
+            // 3. 操作区：刷新资料与删除按钮
+            HStack(spacing: 8) {
+                Button(action: onRefresh) {
+                    if isRefreshing {
+                        ProgressView().scaleEffect(0.6)
+                            .frame(width: 14, height: 14)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11))
+                    }
+                }
+                .buttonStyle(.borderless)
+                .disabled(isRefreshing)
+                .help("从 QQ 重新同步昵称资料")
+
+                Button(action: onDelete) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 10))
+                        Text("移除")
+                            .font(.system(size: 11))
+                    }
+                    .foregroundColor(.red.opacity(0.85))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(10)
+        .background(Color(NSColor.textBackgroundColor).opacity(0.65))
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(NSColor.separatorColor).opacity(0.35), lineWidth: 1)
+        )
     }
 }

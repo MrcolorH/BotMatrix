@@ -136,7 +136,7 @@ public struct QQLoginSheet: View {
 
     private var quickLoginTab: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("本机 NTQQ 历史授权小号")
+            Text("本机 NTQQ 历史登录账号")
                 .font(.system(size: 13, weight: .semibold))
 
             if qqController.quickLoginList.isEmpty && inputUin.isEmpty {
@@ -144,7 +144,7 @@ public struct QQLoginSheet: View {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 24))
                         .foregroundColor(.orange)
-                    Text("暂未扫描到本机历史授权的 QQ 号")
+                    Text("暂未扫描到本机历史登录的 QQ 号")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                     Text("您可以切换到「📱 App 内扫码」登录一次，以后即可永久享受一键秒登！")

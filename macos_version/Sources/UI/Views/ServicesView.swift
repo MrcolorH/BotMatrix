@@ -119,7 +119,7 @@ public struct ServicesView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .tint(.indigo)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
@@ -129,12 +129,12 @@ public struct ServicesView: View {
 
     private var hotReloadBanner: some View {
         HStack(spacing: 12) {
-            Image(systemName: "flame.fill")
+            Image(systemName: "bolt.badge.clock.fill")
                 .font(.system(size: 22))
-                .foregroundColor(.orange)
+                .foregroundColor(.indigo)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("🔥 零重启热更新机制已生效")
+                Text("零重启热更新机制已就绪")
                     .font(.system(size: 13, weight: .bold))
                 Text("添加或修改外部脚本插件时无需重启 App，机器人网络连接长轮询不断线。点击右上角「立即热重载」毫秒级无缝生效！")
                     .font(.system(size: 11))
@@ -154,11 +154,11 @@ public struct ServicesView: View {
             }
         }
         .padding(14)
-        .background(Color.orange.opacity(0.08))
+        .background(Color.indigo.opacity(0.06))
         .cornerRadius(10)
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.orange.opacity(0.25), lineWidth: 1)
+                .stroke(Color.indigo.opacity(0.2), lineWidth: 1)
         )
     }
 
@@ -336,7 +336,7 @@ public struct ServicesView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(.orange)
+                .tint(.indigo)
                 .disabled(isBroadcastingTest || !controller.isRunning || newsService.activeSubscriberCount == 0)
 
                 if !broadcastStatus.isEmpty {
@@ -736,7 +736,7 @@ public struct PlatformToggles: View {
                     .stroke(tgEnabled ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 1)
             )
 
-            // 🐧 QQ 小号开关胶囊
+            // 🐧 QQ 账号开关胶囊
             HStack(spacing: 5) {
                 Image(systemName: "message.fill")
                     .font(.system(size: 10))

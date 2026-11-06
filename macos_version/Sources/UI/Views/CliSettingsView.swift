@@ -78,7 +78,7 @@ public struct CliSettingsView: View {
                     .font(.system(size: 12, weight: .semibold))
 
                 HStack(spacing: 8) {
-                    TextField("/Users/colorh/.local/bin/agy", text: $inputAgyPath)
+                    TextField("例如: ~/.local/bin/agy 或 /usr/local/bin/agy", text: $inputAgyPath)
                         .textFieldStyle(.roundedBorder)
 
                     Button("浏览选择...") {
@@ -167,7 +167,7 @@ public struct CliSettingsView: View {
                     icon: "lock.shield.fill",
                     iconColor: .orange,
                     title: "双模权限与沙箱绝对物理隔离",
-                    desc: "真实管理员具备 Mac mini 宿主设备全权读写；普通访客与群聊用户工作区硬隔离于 ~/.tgbot/sandbox/ 独立沙箱中。"
+                    desc: "系统所有者具备 Mac mini 宿主设备最高读写控制权；普通访客与群聊用户工作区硬隔离于 ~/.tgbot/sandbox/ 独立沙箱中。"
                 )
             }
         }
@@ -190,8 +190,8 @@ public struct CliSettingsView: View {
                 CommandRow(cmd: "/ai <提示词>", role: "所有人", desc: "向反重力 CLI 提问或派发自动化任务 (群聊中 @机器人 + 内容 亦可)")
                 CommandRow(cmd: "/persona", role: "管理员", desc: "查看当前生效的 AI 角色卡人设与设定详情")
                 CommandRow(cmd: "/reset", role: "所有人", desc: "清空自己的当前多轮上下文记忆，开启新对话")
-                CommandRow(cmd: "/quota", role: "真实管理员", desc: "查询后台反重力 CLI 模型消耗与额度监控")
-                CommandRow(cmd: "/status", role: "真实管理员", desc: "查看 Mac mini 宿主系统负载、内存与运行状态")
+                CommandRow(cmd: "/quota", role: "系统所有者", desc: "查询后台反重力 CLI 模型消耗与额度监控")
+                CommandRow(cmd: "/status", role: "系统所有者", desc: "查看 Mac mini 宿主系统负载、内存与运行状态")
             }
         }
         .padding(18)

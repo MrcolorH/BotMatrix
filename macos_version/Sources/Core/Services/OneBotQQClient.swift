@@ -13,6 +13,10 @@ public final class OneBotQQClient {
     private var isIntentionalDisconnect: Bool = false
     private let logger = LogService.shared
 
+    // Echo 动作响应等待映射
+    private var pendingEchoContinuations: [String: CheckedContinuation<[String: Any], Never>] = [:]
+    private let echoLock = NSLock()
+
     private init() {}
 
     /// 连接 OneBot WebSocket 终端
@@ -46,6 +50,13 @@ public final class OneBotQQClient {
         webSocketTask = nil
         session?.invalidateAndCancel()
         session = nil
+
+        echoLock.lock()
+        for (_, cont) in pendingEchoContinuations {
+            cont.resume(returning: [:])
+        }
+        pendingEchoContinuations.removeAll()
+        echoLock.unlock()
     }
 
     private func receiveLoop() {
@@ -56,18 +67,29 @@ public final class OneBotQQClient {
 
             switch result {
             case .success(let message):
+                var receivedJson: [String: Any]?
                 switch message {
                 case .string(let text):
                     if let data = text.data(using: .utf8),
                        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-                        self.onEventCallback?(json)
+                        receivedJson = json
                     }
                 case .data(let data):
                     if let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-                        self.onEventCallback?(json)
+                        receivedJson = json
                     }
                 @unknown default:
                     break
+                }
+
+                if let json = receivedJson {
+                    if let echo = json["echo"] as? String {
+                        self.echoLock.lock()
+                        let cont = self.pendingEchoContinuations.removeValue(forKey: echo)
+                        self.echoLock.unlock()
+                        cont?.resume(returning: json)
+                    }
+                    self.onEventCallback?(json)
                 }
                 // 继续监听下一个事件
                 self.receiveLoop()
@@ -209,5 +231,87 @@ public final class OneBotQQClient {
         if let jsonStr = String(data: data, encoding: .utf8) {
             try await task.send(.string(jsonStr))
         }
+    }
+
+    /// 处理加好友请求 (OneBot v11: set_friend_add_request)
+    /// - Parameters:
+    ///   - flag: 加好友请求的 flag (从事件获取)
+    ///   - approve: 是否同意 (true 为同意，false 为拒绝)
+    ///   - remark: 添加后的好友备注 (可选)
+    public func setFriendAddRequest(flag: String, approve: Bool, remark: String = "") async throws {
+        guard let task = webSocketTask, isConnected else { return }
+
+        var params: [String: Any] = [
+            "flag": flag,
+            "approve": approve
+        ]
+        if !remark.isEmpty {
+            params["remark"] = remark
+        }
+
+        let payload: [String: Any] = [
+            "action": "set_friend_add_request",
+            "params": params,
+            "echo": "friend_req_\(Int(Date().timeIntervalSince1970 * 1000))"
+        ]
+
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        if let jsonStr = String(data: data, encoding: .utf8) {
+            try await task.send(.string(jsonStr))
+        }
+    }
+
+    private func registerEcho(echoId: String, continuation: CheckedContinuation<[String: Any], Never>) {
+        echoLock.lock()
+        pendingEchoContinuations[echoId] = continuation
+        echoLock.unlock()
+    }
+
+    private func popEcho(echoId: String) -> CheckedContinuation<[String: Any], Never>? {
+        echoLock.lock()
+        defer { echoLock.unlock() }
+        return pendingEchoContinuations.removeValue(forKey: echoId)
+    }
+
+    /// 发送 OneBot 动作并等待带 echo 的异步结果
+    public func callAction(action: String, params: [String: Any], timeout: TimeInterval = 3.0) async -> [String: Any]? {
+        guard let task = webSocketTask, isConnected else { return nil }
+        let echoId = "echo_\(action)_\(UUID().uuidString.prefix(8))"
+        let payload: [String: Any] = [
+            "action": action,
+            "params": params,
+            "echo": echoId
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload),
+              let jsonStr = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+
+        return await withCheckedContinuation { continuation in
+            registerEcho(echoId: echoId, continuation: continuation)
+
+            Task {
+                do {
+                    try await task.send(.string(jsonStr))
+                } catch {
+                    popEcho(echoId: echoId)?.resume(returning: [:])
+                    return
+                }
+
+                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                popEcho(echoId: echoId)?.resume(returning: [:])
+            }
+        }
+    }
+
+    /// 查询 QQ 用户信息 (资料/昵称)
+    public func fetchStrangerInfo(userId: Int64) async -> (nickname: String?, qid: String?) {
+        guard let res = await callAction(action: "get_stranger_info", params: ["user_id": userId, "no_cache": false]),
+              let data = res["data"] as? [String: Any] else {
+            return (nil, nil)
+        }
+        let nick = data["nickname"] as? String
+        let qid = data["qid"] as? String
+        return (nick, qid)
     }
 }

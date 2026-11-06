@@ -71,7 +71,7 @@ cat << 'EOF' > "$CONTENTS_DIR/Info.plist"
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2026 TGBot Hub. All rights reserved.</string>
+    <string>Copyright © 2026 BotMatrix. All rights reserved.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>

@@ -86,7 +86,7 @@ class SettingsPage extends StatelessWidget {
                     const Text(
                       '版本：v1.0.0 (Flutter Standalone Edition)\n'
                       '作者：MrcolorH (@MrcolorH)\n'
-                      '开源：https://github.com/MrcolorH/TGBot\n'
+                      '开源：https://github.com/MrcolorH/BotMatrix\n'
                       '架构：纯 Dart 高性能异步事件驱动 + 原生前台保活服务\n'
                       '特性：插槽式模块化设计，预留无限功能扩展槽位。',
                       style: TextStyle(fontSize: 13, height: 1.5),

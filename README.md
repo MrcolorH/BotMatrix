@@ -1,11 +1,11 @@
-# 🤖 TGBot Hub (多平台智能机器人控制中枢)
+# 🌐 BotMatrix (多平台智能机器人控制中枢与工作站)
 
-[![Release](https://img.shields.io/github/v/release/MrcolorH/TGBot?color=blue)](https://github.com/MrcolorH/TGBot/releases/latest)
+[![Release](https://img.shields.io/github/v/release/MrcolorH/BotMatrix?color=blue)](https://github.com/MrcolorH/BotMatrix/releases/latest)
 [![macOS Native](https://img.shields.io/badge/macOS-SwiftUI%20%7C%20TG%20%2B%20QQ-orange.svg)](macos_version)
 [![Flutter](https://img.shields.io/badge/Android-Flutter%203.x-blue.svg)](flutter_version)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**TGBot Hub** 是一款现代化、高性能的多平台机器人控制中枢与工作站。从最初的单一 Telegram 机器人扩展为集 **Telegram** 与 **QQ** 双平台驱动、**本地 AI 大模型终端调度**、**全网视频智能嗅探解析**、**每日晨报定时推送**与**动态插件市场**于一体的综合智能自动化中枢。
+**BotMatrix** 是一款现代化、高性能的多平台机器人控制中枢与工作站。从最初的单一 Telegram 机器人升级拓展为集 **Telegram** 与 **QQ** 双平台驱动、**本地 AI 大模型终端调度**、**全网视频智能嗅探解析**、**每日晨报定时推送**与**动态插件市场**于一体的综合智能自动化中枢。
 
 针对桌面与移动端不同场景，本项目提供两个深度打磨的专属形态：
 
@@ -79,7 +79,7 @@
 ### 📱 2. Android 独立 App（移动随身）
 
 1. **获取与安装**：
-   - 可在 [GitHub Releases 页面](https://github.com/MrcolorH/TGBot/releases) 下载最新 APK 安装包；
+   - 可在 [GitHub Releases 页面](https://github.com/MrcolorH/BotMatrix/releases) 下载安装包；
    - 或在 `flutter_version` 目录执行打包：
      ```bash
      cd flutter_version

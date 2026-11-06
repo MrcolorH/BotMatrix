@@ -54,7 +54,7 @@ public struct AboutView: View {
                 .cornerRadius(8)
             }
 
-            Text("查看 TGBot Hub 作者信息、系统环境、本地存储目录及核心技术架构。")
+            Text("查看 BotMatrix 作者信息、系统环境、本地存储目录及核心技术架构。")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
         }
@@ -82,7 +82,7 @@ public struct AboutView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
-                    Text("TGBot Hub for macOS")
+                    Text("BotMatrix for macOS")
                         .font(.system(size: 20, weight: .bold))
 
                     Text("v1.3.0")
@@ -184,7 +184,7 @@ public struct AboutView: View {
                     .controlSize(.small)
 
                     Button(action: {
-                        if let url = URL(string: "https://github.com/MrcolorH/TGBot") {
+                        if let url = URL(string: "https://github.com/MrcolorH/BotMatrix") {
                             NSWorkspace.shared.open(url)
                         }
                     }) {
@@ -207,7 +207,7 @@ public struct AboutView: View {
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
 
-                Label("仓库地址: github.com/MrcolorH/TGBot", systemImage: "link")
+                Label("仓库地址: github.com/MrcolorH/BotMatrix", systemImage: "link")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }

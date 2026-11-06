@@ -28,7 +28,7 @@
 | **`TGBot_64bit_arm64.apk`** | `arm64-v8a` | **99% 的现代主流安卓手机**（推荐） | **~18 MB** |
 | **`TGBot_32bit_arm.apk`** | `armeabi-v7a` | 早期 32 位老旧安卓备用机 | **~15 MB** |
 
-👉 也可在 [GitHub Releases 最新发布页](https://github.com/MrcolorH/TGBot/releases/latest) 直接下载 APK。
+👉 也可在 [GitHub Releases 最新发布页](https://github.com/MrcolorH/BotMatrix/releases/latest) 直接下载 APK。
 
 ---
 

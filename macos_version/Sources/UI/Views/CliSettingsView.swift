@@ -3,12 +3,14 @@ import AppKit
 
 public struct CliSettingsView: View {
     @ObservedObject var storage: StorageService
+    @ObservedObject private var installer = AgyInstallerService.shared
 
     @State private var inputAgyPath: String = ""
     @State private var isTestingAgy: Bool = false
     @State private var agyTestResult: String? = nil
     @State private var agyTestSuccess: Bool = false
     @State private var showSavedToast: Bool = false
+    @State private var showInstallSheet: Bool = false
 
     public init(storage: StorageService) {
         self.storage = storage
@@ -18,6 +20,8 @@ public struct CliSettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 headerSection
+
+                installerSection
 
                 cliConfigSection
 
@@ -30,6 +34,12 @@ public struct CliSettingsView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .onAppear {
             inputAgyPath = storage.agyCliPath
+        }
+        .sheet(isPresented: $showInstallSheet) {
+            AgyInstallSheet()
+                .onDisappear {
+                    inputAgyPath = storage.agyCliPath
+                }
         }
     }
 
@@ -65,6 +75,87 @@ public struct CliSettingsView: View {
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
         }
+    }
+
+    // MARK: - 一键安装与环境向导卡片
+    private var installerSection: some View {
+        let isExecutable = FileManager.default.isExecutableFile(atPath: storage.agyCliPath)
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(isExecutable ? "反重力 CLI 运行环境 (已就绪)" : "反重力 (AGY) CLI 一键安装向导", systemImage: "sparkles.rectangle.stack.fill")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(isExecutable ? .primary : .green)
+
+                Spacer()
+
+                if isExecutable {
+                    HStack(spacing: 5) {
+                        Circle().fill(Color.green).frame(width: 8, height: 8)
+                        Text("已安装可用")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.green)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.green.opacity(0.12))
+                    .cornerRadius(6)
+                } else {
+                    HStack(spacing: 5) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text("未安装或路径无效")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.orange)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.orange.opacity(0.12))
+                    .cornerRadius(6)
+                }
+            }
+
+            Text("支持在安装前**自动测试 Gemini / Google 节点网络连通性**。若未挂魔法或网络受阻，向导将提前预警并提供网络排错建议，确保安装顺利完成。")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+                .lineSpacing(3)
+
+            HStack(spacing: 12) {
+                Button(action: {
+                    installer.reset()
+                    showInstallSheet = true
+                    Task {
+                        _ = await installer.testNetworkConnectivity()
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "network")
+                        Text("测试 Gemini 网络连通性")
+                    }
+                }
+                .buttonStyle(.bordered)
+
+                Button(action: {
+                    installer.reset()
+                    showInstallSheet = true
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bolt.fill")
+                        Text(isExecutable ? "重新安装 / 升级反重力 CLI..." : "⚡️ 一键安装反重力 CLI (含网络预检)")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+            }
+            .padding(.top, 4)
+        }
+        .padding(18)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isExecutable ? Color(NSColor.separatorColor).opacity(0.4) : Color.green.opacity(0.4), lineWidth: 1)
+        )
     }
 
     // MARK: - CLI 路径配置卡片

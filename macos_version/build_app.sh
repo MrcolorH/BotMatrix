@@ -118,8 +118,39 @@ echo "✅ DMG 磁盘镜像包已生成: $DMG_FILE"
 echo "📦 [5/5] 正在生成 macOS 官方引导式安装包 (.pkg) 与通用分发压缩包 (.zip)..."
 PKG_FILE="$BUILD_DIR/${APP_NAME}_macOS_v${VERSION}.pkg"
 rm -f "$PKG_FILE"
-pkgbuild --install-location "/Applications/$APP_NAME.app" --component "$APP_BUNDLE" "$PKG_FILE"
-echo "✅ PKG 系统向导安装包已生成: $PKG_FILE"
+
+# 准备 PKG 后置处理脚本 (自动移除隔离属性、修复权限、防止路径嵌套)
+PKG_SCRIPTS_DIR="$BUILD_DIR/pkg_scripts"
+rm -rf "$PKG_SCRIPTS_DIR"
+mkdir -p "$PKG_SCRIPTS_DIR"
+cat << 'EOF_POST' > "$PKG_SCRIPTS_DIR/postinstall"
+#!/bin/bash
+TARGET_APP="/Applications/BotMatrix.app"
+
+# 1. 修复早期版本可能产生的嵌套目录问题
+if [ -d "$TARGET_APP/BotMatrix.app" ]; then
+    cp -R "$TARGET_APP/BotMatrix.app/" "/Applications/BotMatrix_temp.app/"
+    rm -rf "$TARGET_APP"
+    mv "/Applications/BotMatrix_temp.app" "$TARGET_APP"
+fi
+
+# 2. 清除 macOS Gatekeeper Quarantine 隔离标志，彻底杜绝“已损坏无法打开”拦截
+xattr -cr "$TARGET_APP" 2>/dev/null || true
+
+# 3. 递归赋予所有权与执行权限
+chmod -R 755 "$TARGET_APP" 2>/dev/null || true
+
+# 4. 清理旧版本痕迹
+rm -rf "/Applications/TGBot.app" 2>/dev/null || true
+
+exit 0
+EOF_POST
+chmod +x "$PKG_SCRIPTS_DIR/postinstall"
+
+# 注意：component 为 BotMatrix.app，安装位置必须是 /Applications（非 /Applications/BotMatrix.app，否则会嵌套）
+pkgbuild --install-location "/Applications" --component "$APP_BUNDLE" --scripts "$PKG_SCRIPTS_DIR" "$PKG_FILE"
+rm -rf "$PKG_SCRIPTS_DIR"
+echo "✅ PKG 系统向导安装包已生成 (含 postinstall 自动授权修复): $PKG_FILE"
 
 ZIP_FILE="$BUILD_DIR/${APP_NAME}_macOS_v${VERSION}.zip"
 rm -f "$ZIP_FILE"

@@ -205,6 +205,11 @@ public final class AgyService {
                         cleanStdout = cleanStderr
                     }
 
+                    // 拦截并诊断常见的 Gemini "出了点问题 (4)" / 会话风控异常
+                    if cleanStdout.contains("出了点问题") || cleanStdout.contains("Something went wrong") || cleanStderr.contains("出了点问题") || cleanStderr.contains("Something went wrong") {
+                        cleanStdout += "\n\n💡【Gemini 故障诊断提示】检测到服务端会话或网络风控异常 (常见如错误代码 4)：\n1. 可发送 `/reset` 清理记忆并开启新对话；\n2. 当前代理节点可能已被 Google 临时限制，请在科学上网工具中切换节点（推荐美区优质节点并开启 TUN 模式）；\n3. 若账号会话过期，建议在终端中直接运行一次 `agy` 刷新 Google 登录态。"
+                    }
+
                     if !cleanStdout.isEmpty {
                         if let sk = sessionKey {
                             let session = SessionManager.shared.getSession(sessionKey: sk, timeoutMinutes: timeoutMinutes)

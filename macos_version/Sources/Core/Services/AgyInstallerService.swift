@@ -62,12 +62,14 @@ public final class AgyInstallerService: ObservableObject {
         appendLog("🌐 开始检测网络环境 (Gemini API 与 Google 服务节点)...")
 
         let endpoints = [
+            ("Gemini 会话服务", URL(string: "https://gemini.google.com")!),
             ("Gemini API 节点", URL(string: "https://generativelanguage.googleapis.com")!),
             ("Antigravity 官方安装源", URL(string: "https://antigravity.google/cli/install.sh")!)
         ]
 
         var successCount = 0
         var totalLatencyMs = 0
+        var hasRiskBlockedNode = false
 
         for (name, url) in endpoints {
             appendLog("🔍 正在测试连通: \(name) (\(url.host ?? ""))")
@@ -82,7 +84,10 @@ public final class AgyInstallerService: ObservableObject {
                 let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
                 if let httpResp = response as? HTTPURLResponse {
                     // HTTP 状态码 200~499 均代表网络握手成功，成功到达 Google 节点
-                    if httpResp.statusCode < 500 {
+                    if httpResp.statusCode == 403 || httpResp.statusCode == 429 {
+                        hasRiskBlockedNode = true
+                        appendLog("  ⚠️ \(name) 收到 \(httpResp.statusCode)：当前代理节点可能已被 Google 风控限制，易导致 Gemini '出了点问题 (4)'。建议更换更纯净的节点。")
+                    } else if httpResp.statusCode < 500 {
                         successCount += 1
                         totalLatencyMs += elapsedMs
                         appendLog("  ✓ \(name) 连接成功！响应状态: \(httpResp.statusCode)，延迟: \(elapsedMs)ms")
@@ -102,7 +107,11 @@ public final class AgyInstallerService: ObservableObject {
             let avgLatency = totalLatencyMs / max(1, successCount)
             self.networkCheckPassed = true
             self.networkLatencyMs = avgLatency
-            self.networkCheckMessage = "网络连通正常 (Gemini/Google 节点畅通，延迟约 \(avgLatency)ms)"
+            if hasRiskBlockedNode {
+                self.networkCheckMessage = "网络已连通，但部分 Google 节点返回拦截限制。若遇到 Gemini 报错 (4)，请更换代理节点地区。"
+            } else {
+                self.networkCheckMessage = "网络连通正常 (Gemini/Google 节点畅通，延迟约 \(avgLatency)ms)"
+            }
             appendLog("✅ 网络环境测试通过：Google / Gemini 网络链路通畅，具备安装与运行条件。")
             return true
         } else {
